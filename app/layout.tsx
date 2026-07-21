@@ -2,7 +2,6 @@ import { Fraunces, Source_Sans_3 } from "next/font/google";
 import type { Metadata } from "next";
 
 import { QueryProvider } from "@/components/providers/query-provider";
-import { ToastProvider } from "@/components/providers/toast-provider";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -30,10 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${fraunces.variable} ${sourceSans.variable} font-sans`}>
-        <QueryProvider>
-          {children}
-          <ToastProvider />
-        </QueryProvider>
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

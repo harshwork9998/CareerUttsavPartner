@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { HeroSection } from "@/features/dashboard/hero-section";
 import { PackageSection } from "@/features/dashboard/package-section";
@@ -141,7 +140,6 @@ export function DashboardView() {
               url,
               fileSizeBytes: file.size,
             });
-            toast.success("Logo updated — looking great!");
           }}
           saving={patchMutation.isPending}
         />
@@ -162,7 +160,6 @@ export function DashboardView() {
                   field,
                   value,
                 });
-                toast.success("Saved");
               }}
               onUploadFile={async (kind, label, file) => {
                 const url = await readFileAsDataUrl(file);
@@ -175,7 +172,6 @@ export function DashboardView() {
                   url,
                   fileSizeBytes: file.size,
                 });
-                toast.success(`${label} received`);
               }}
               onSaveSpeakers={async (eventId, seminarId, speakers) => {
                 await patchMutation.mutateAsync({
@@ -184,7 +180,6 @@ export function DashboardView() {
                   seminarId,
                   speakers,
                 });
-                toast.success("Speaker details saved");
               }}
             />
           </div>
@@ -221,7 +216,6 @@ export function DashboardView() {
             action: "change_password",
             password,
           });
-          toast.success("Password updated");
           refresh();
         }}
       />

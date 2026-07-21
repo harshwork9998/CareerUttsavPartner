@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 import { MULTI_EVENT_DEMO } from "@/lib/seed-data";
 
@@ -29,7 +28,6 @@ export function LoginView() {
         setError(data.error ?? "Sign in failed");
         return;
       }
-      toast.success("Welcome to your partner dashboard");
       router.replace("/dashboard");
       router.refresh();
     } catch {
