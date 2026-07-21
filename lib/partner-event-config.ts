@@ -35,7 +35,7 @@ export function buildEventPackageSummaries(
       eventId: ep.eventId,
       title: event.title,
       city: event.city,
-      tier: String(ep.sponsorshipTier),
+      tier: ep.sponsorshipTier,
       deliverables: ep.deliverables
         .filter((d) => d.included)
         .map((d) => ({
@@ -58,10 +58,10 @@ export function resolveEventPartnerships(partner: Partner): PartnerEventPartners
       deliverables: ep.deliverables.map((d) => ({ ...d })),
     }));
   }
-  if (!partner.eventIds.length || !partner.sponsorshipTier) return [];
+  if (!partner.eventIds.length) return [];
   return partner.eventIds.map((eventId) => ({
     eventId,
-    sponsorshipTier: partner.sponsorshipTier ?? ("" as const),
+    sponsorshipTier: partner.sponsorshipTier,
     deliverables: (partner.deliverables ?? []).map((d) => ({ ...d })),
     seminarSlotCount: 0,
   }));

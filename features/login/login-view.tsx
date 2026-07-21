@@ -5,10 +5,12 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MULTI_EVENT_DEMO } from "@/lib/seed-data";
+
 export function LoginView() {
   const router = useRouter();
-  const [login, setLogin] = useState("partnerships@rvu.edu.in");
-  const [password, setPassword] = useState("TempPass9x");
+  const [login, setLogin] = useState<string>(MULTI_EVENT_DEMO.login);
+  const [password, setPassword] = useState<string>(MULTI_EVENT_DEMO.password);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -131,13 +133,14 @@ export function LoginView() {
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign in"}
           </button>
 
-          <div className="mt-5 rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-xs leading-relaxed text-ink-secondary">
-            <strong className="text-brand-700">Demo:</strong> RV University —{" "}
-            <code className="text-[11px]">partnerships@rvu.edu.in</code> /{" "}
-            <code className="text-[11px]">TempPass9x</code>
-            <br />
-            PES University — <code className="text-[11px]">kavitha.nair@pes.edu</code>{" "}
-            / <code className="text-[11px]">PesPortal9x</code>
+          <div className="mt-5 rounded-2xl border border-brass-500/30 bg-brass-100/60 px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+            <strong className="text-brass-700">3-event layout demo:</strong>{" "}
+            Christ University —{" "}
+            <code className="text-[11px]">{MULTI_EVENT_DEMO.login}</code> /{" "}
+            <code className="text-[11px]">{MULTI_EVENT_DEMO.password}</code>
+            <span className="mt-1 block text-[11px] text-ink-muted">
+              Bangalore · Mysore · Hubli — separate packages, tiers &amp; seminars
+            </span>
           </div>
         </form>
       </div>

@@ -1,13 +1,35 @@
 import { generateId } from "@/lib/utils";
-import { seedPartners, mockEvents } from "@/lib/seed-data";
-import type {
+import { fetchAdminPartners } from "@/lib/admin-api";
+import { seedPartners, mockEvents } from "@/lib/seed-data";import type {
   Partner,
   PartnerPortalDocument,
   PartnerSeminarSpeakerSubmission,
 } from "@/lib/types";
 
-/** In-memory partner store — mirrors admin partnersService for mock phase */
+/** In-memory partner store — seed first, then merged with Admin API partners */
 let partnersStore: Partner[] = structuredClone(seedPartners);
+let adminMerged = false;
+
+export async function mergeAdminPartners() {
+  if (adminMerged) return;
+  const fromAdmin = await fetchAdminPartners();
+  for (const adminPartner of fromAdmin) {
+    const login = adminPartner.portalLogin?.toLowerCase();
+    if (!login) continue;
+    const idx = partnersStore.findIndex(
+      (p) => p.portalLogin?.toLowerCase() === login
+    );
+    if (idx >= 0) {
+      partnersStore[idx] = { ...partnersStore[idx], ...adminPartner };
+    } else {
+      partnersStore.push(adminPartner);
+    }
+  }
+  adminMerged = true;
+}
+export function reloadPartnerStoreFromSeed() {
+  partnersStore = structuredClone(seedPartners);
+}
 
 export function getAllPartners() {
   return [...partnersStore];

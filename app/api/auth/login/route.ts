@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPartnerByLogin } from "@/lib/partner-store";
+import { getPartnerByLogin, mergeAdminPartners } from "@/lib/partner-store";
 import { setSession } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -14,8 +14,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const partner = getPartnerByLogin(login);
-  if (!partner?.portalInviteSentAt) {
+  await mergeAdminPartners();
+
+  const partner = getPartnerByLogin(login);  if (!partner?.portalInviteSentAt) {
     return NextResponse.json(
       { error: "Partner access has not been activated yet" },
       { status: 401 }

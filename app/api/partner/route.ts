@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getEvents,
   getPartnerById,
+  mergeAdminPartners,
   setSeminarSpeakers,
   updatePartner,
   upsertPortalDocument,
@@ -18,6 +19,8 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  await mergeAdminPartners();
 
   const partner = getPartnerById(session.partnerId);
   if (!partner) {

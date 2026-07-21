@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   FileUp,
@@ -17,6 +17,16 @@ import type {
   Partner,
   PartnerSeminarSpeakerDetail,
 } from "@/lib/types";
+
+function findSubmissionDoc(
+  partner: Partner,
+  kind: "souvenir_writeup" | "ad_creative"
+) {
+  return partner.portalDocuments?.find(
+    (d) =>
+      d.kind === kind || (kind === "souvenir_writeup" && d.kind === "writeup")
+  );
+}
 
 export function SubmissionsSection({
   partner,
@@ -53,7 +63,7 @@ export function SubmissionsSection({
   );
 
   return (
-    <section className="rounded-3xl border border-line-subtle bg-white p-5 shadow-card sm:p-6">
+    <section className="flex h-full flex-col rounded-3xl border border-line-subtle bg-white p-5 shadow-card sm:p-6">
       <div className="mb-5">
         <h2 className="font-display text-xl font-bold text-brand-800">
           What we need from you
@@ -106,9 +116,7 @@ export function SubmissionsSection({
           }
 
           if (item.type === "file") {
-            const doc = partner.portalDocuments?.find(
-              (d) => d.kind === item.docKind
-            );
+            const doc = findSubmissionDoc(partner, item.docKind);
             return (
               <FileUploadCard
                 key={item.key}
@@ -194,6 +202,10 @@ function TextFieldCard({
   const [draft, setDraft] = useState(value);
   const dirty = draft.trim() !== value.trim();
 
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
   return (
     <div
       className={`rounded-2xl border px-4 py-3.5 transition ${
@@ -247,6 +259,10 @@ function TextAreaCard({
 }) {
   const [draft, setDraft] = useState(value);
   const dirty = draft.trim() !== value.trim();
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
 
   return (
     <div
@@ -356,18 +372,42 @@ function SpeakerCard({
   saving: boolean;
   onSave: (speakers: PartnerSeminarSpeakerDetail[]) => Promise<void>;
 }) {
-  const [speakers, setSpeakers] = useState<PartnerSeminarSpeakerDetail[]>(
+  const normalizeSpeaker = (
+    s: PartnerSeminarSpeakerDetail
+  ): PartnerSeminarSpeakerDetail => ({
+    name: s.name ?? "",
+    designation: s.designation ?? "",
+    contact: s.contact ?? s.phone ?? s.email ?? "",
+    introduction: s.introduction ?? "",
+  });
+
+  const [speakers, setSpeakers] = useState<PartnerSeminarSpeakerDetail[]>(() =>
     initialSpeakers.length
-      ? initialSpeakers
+      ? initialSpeakers.map(normalizeSpeaker)
       : Array.from({ length: seats }, () => ({
           name: "",
           designation: "",
-          email: "",
-          phone: "",
+          contact: "",
+          introduction: "",
         }))
   );
 
+  useEffect(() => {
+    if (initialSpeakers.length) {
+      setSpeakers(initialSpeakers.map(normalizeSpeaker));
+    }
+  }, [initialSpeakers]);
+
   const done = speakers.some((s) => s.name.trim());
+
+  const patchSpeaker = (
+    index: number,
+    patch: Partial<PartnerSeminarSpeakerDetail>
+  ) => {
+    setSpeakers((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, ...patch } : row))
+    );
+  };
 
   return (
     <div className="rounded-2xl border border-line-subtle bg-paper-page p-4">
@@ -382,43 +422,48 @@ function SpeakerCard({
           <span className="text-[11px] font-bold text-success">Saved</span>
         ) : null}
       </div>
-      <div className="space-y-3">
+      <div className="space-y-4">
         {speakers.map((speaker, i) => (
           <div
             key={i}
-            className="grid gap-2 rounded-xl border border-line-subtle bg-white p-3 sm:grid-cols-2"
+            className="space-y-2.5 rounded-xl border border-line-subtle bg-white p-3.5"
           >
+            <p className="text-[11px] font-bold uppercase tracking-wide text-brand-700">
+              Speaker {i + 1}
+            </p>
             <input
-              placeholder={`Speaker ${i + 1} name *`}
+              placeholder="Name *"
               value={speaker.name}
-              onChange={(e) => {
-                const next = [...speakers];
-                next[i] = { ...next[i], name: e.target.value };
-                setSpeakers(next);
-              }}
-              className="h-10 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500 sm:col-span-2"
+              onChange={(e) => patchSpeaker(i, { name: e.target.value })}
+              className="h-10 w-full rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
             />
             <input
               placeholder="Designation"
               value={speaker.designation ?? ""}
-              onChange={(e) => {
-                const next = [...speakers];
-                next[i] = { ...next[i], designation: e.target.value };
-                setSpeakers(next);
-              }}
-              className="h-10 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
+              onChange={(e) => patchSpeaker(i, { designation: e.target.value })}
+              className="h-10 w-full rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
             />
             <input
-              placeholder="Email"
-              type="email"
-              value={speaker.email ?? ""}
-              onChange={(e) => {
-                const next = [...speakers];
-                next[i] = { ...next[i], email: e.target.value };
-                setSpeakers(next);
-              }}
-              className="h-10 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
+              placeholder="Contact (phone or email)"
+              value={speaker.contact ?? ""}
+              onChange={(e) => patchSpeaker(i, { contact: e.target.value })}
+              className="h-10 w-full rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
             />
+            <div>
+              <textarea
+                placeholder="Introduction — brief bio for the seminar programme"
+                value={speaker.introduction ?? ""}
+                maxLength={1000}
+                rows={4}
+                onChange={(e) =>
+                  patchSpeaker(i, { introduction: e.target.value })
+                }
+                className="w-full resize-y rounded-lg border border-line-strong px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+              />
+              <p className="mt-1 text-right text-[11px] tabular-nums text-ink-muted">
+                {(speaker.introduction ?? "").length}/1000
+              </p>
+            </div>
           </div>
         ))}
       </div>

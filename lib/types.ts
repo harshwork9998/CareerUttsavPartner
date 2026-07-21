@@ -1,9 +1,11 @@
 export type SponsorshipTier =
-  | "Knowledge Partner (Gold)"
+  | "Presenting Partner"
+  | "Co-Presenting Partner"
   | "University Partner"
-  | "Stall Partner"
-  | "Session Partner"
-  | "";
+  | "Knowledge Partner (Gold)"
+  | "Knowledge Partner (Silver)"
+  | "Education Partner"
+  | "Stall Partner";
 
 export interface PartnerDeliverable {
   id: string;
@@ -16,7 +18,7 @@ export interface PartnerDeliverable {
 
 export interface PartnerEventPartnership {
   eventId: string;
-  sponsorshipTier: SponsorshipTier;
+  sponsorshipTier?: SponsorshipTier;
   deliverables: PartnerDeliverable[];
   seminarSlotCount: number;
 }
@@ -29,6 +31,9 @@ export interface PartnerSeminarSlotAssignment {
 
 export type PartnerPortalDocumentKind =
   | "logo"
+  | "banner"
+  | "brochure"
+  | "agreement"
   | "souvenir_writeup"
   | "ad_creative"
   | "writeup";
@@ -47,6 +52,8 @@ export interface PartnerPortalDocument {
 export interface PartnerSeminarSpeakerDetail {
   name: string;
   designation?: string;
+  contact?: string;
+  introduction?: string;
   phone?: string;
   email?: string;
 }
@@ -103,9 +110,17 @@ export type EventPackageSummary = {
   eventId: string;
   title: string;
   city: string;
-  tier: string;
+  tier: SponsorshipTier | undefined;
   deliverables: Array<{ id: string; label: string; option?: string }>;
-  seminars: Array<{ id: string; title: string; slots: number; date: string; startTime: string; endTime: string; hall: number }>;
+  seminars: Array<{
+    id: string;
+    title: string;
+    slots: number;
+    date: string;
+    startTime: string;
+    endTime: string;
+    hall: number;
+  }>;
   slotBudget: number;
   seatsAssigned: number;
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -48,6 +49,12 @@ export function DashboardView() {
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ["partner-dashboard"] });
 
+  useEffect(() => {
+    if (!isLoading && (isError || !data)) {
+      router.replace("/login");
+    }
+  }, [isLoading, isError, data, router]);
+
   const patchMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
       const res = await fetch("/api/partner", {
@@ -74,7 +81,6 @@ export function DashboardView() {
   }
 
   if (isError || !data) {
-    router.replace("/login");
     return null;
   }
 
@@ -140,47 +146,52 @@ export function DashboardView() {
           saving={patchMutation.isPending}
         />
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
-          <div className="space-y-5">
+        <div className="mt-6 grid gap-5 lg:grid-cols-[1.35fr_0.85fr] lg:items-start">
+          <div className="min-w-0">
             <PackageSection packages={packages} />
-            <SeminarSection packages={packages} />
           </div>
 
-          <SubmissionsSection
-            partner={partner}
-            packages={packages}
-            saving={patchMutation.isPending}
-            onSaveText={async (field, value) => {
-              await patchMutation.mutateAsync({
-                action: "text_field",
-                field,
-                value,
-              });
-              toast.success("Saved");
-            }}
-            onUploadFile={async (kind, label, file) => {
-              const url = await readFileAsDataUrl(file);
-              await patchMutation.mutateAsync({
-                action: "upload_document",
-                kind,
-                label,
-                fileName: file.name,
-                mimeType: file.type,
-                url,
-                fileSizeBytes: file.size,
-              });
-              toast.success(`${label} received`);
-            }}
-            onSaveSpeakers={async (eventId, seminarId, speakers) => {
-              await patchMutation.mutateAsync({
-                action: "seminar_speakers",
-                eventId,
-                seminarId,
-                speakers,
-              });
-              toast.success("Speaker details saved");
-            }}
-          />
+          <div className="min-w-0 lg:row-span-2 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pr-0.5">
+            <SubmissionsSection
+              partner={partner}
+              packages={packages}
+              saving={patchMutation.isPending}
+              onSaveText={async (field, value) => {
+                await patchMutation.mutateAsync({
+                  action: "text_field",
+                  field,
+                  value,
+                });
+                toast.success("Saved");
+              }}
+              onUploadFile={async (kind, label, file) => {
+                const url = await readFileAsDataUrl(file);
+                await patchMutation.mutateAsync({
+                  action: "upload_document",
+                  kind,
+                  label,
+                  fileName: file.name,
+                  mimeType: file.type,
+                  url,
+                  fileSizeBytes: file.size,
+                });
+                toast.success(`${label} received`);
+              }}
+              onSaveSpeakers={async (eventId, seminarId, speakers) => {
+                await patchMutation.mutateAsync({
+                  action: "seminar_speakers",
+                  eventId,
+                  seminarId,
+                  speakers,
+                });
+                toast.success("Speaker details saved");
+              }}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <SeminarSection packages={packages} />
+          </div>
         </div>
 
         <p className="mt-10 text-center text-xs text-ink-muted">
