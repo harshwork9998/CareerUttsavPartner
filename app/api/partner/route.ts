@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { patchAdminPartner, pickPortalSyncPatch } from "@/lib/admin-api";
 import {
   getEvents,
   getPartnerById,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/partner-store";
 import {
   buildEventPackageSummaries,
+  enrichSeminarSlotAssignments,
   resolveEventPartnerships,
 } from "@/lib/partner-event-config";
 import { getSession } from "@/lib/session";
@@ -29,9 +31,13 @@ export async function GET() {
 
   const events = getEvents();
   const partnerships = resolveEventPartnerships(partner);
+  const slotAssignments = enrichSeminarSlotAssignments(
+    partner.seminarSlotAssignments ?? [],
+    events
+  );
   const packages = buildEventPackageSummaries(
     partnerships,
-    partner.seminarSlotAssignments ?? [],
+    slotAssignments,
     events
   );
 
@@ -44,6 +50,12 @@ export async function GET() {
     uploadStatus: getPartnerPortalUploadStatus(partner),
     mustChangePassword: session.mustChangePassword,
   });
+}
+
+async function syncPartnerPortalToAdmin(partnerId: string) {
+  const partner = getPartnerById(partnerId);
+  if (!partner) return;
+  await patchAdminPartner(partner.id, pickPortalSyncPatch(partner));
 }
 
 export async function PATCH(request: Request) {
@@ -70,6 +82,7 @@ export async function PATCH(request: Request) {
       portalTempPassword: password,
       portalPasswordChangedAt: new Date().toISOString(),
     });
+    await syncPartnerPortalToAdmin(partner.id);
     await import("@/lib/session").then(({ setSession }) =>
       setSession({ ...session, mustChangePassword: false })
     );
@@ -85,6 +98,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid field" }, { status: 400 });
     }
     updatePartner(partner.id, { [field]: String(body.value ?? "") });
+    await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }
 
@@ -98,6 +112,7 @@ export async function PATCH(request: Request) {
       url,
       fileSizeBytes: Number(fileSizeBytes) || 0,
     });
+    await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }
 
@@ -108,6 +123,7 @@ export async function PATCH(request: Request) {
       body.seminarId,
       body.speakers ?? []
     );
+    await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }
 

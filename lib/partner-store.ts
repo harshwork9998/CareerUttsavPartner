@@ -1,17 +1,18 @@
 import { generateId } from "@/lib/utils";
-import { fetchAdminPartners } from "@/lib/admin-api";
-import { seedPartners, mockEvents } from "@/lib/seed-data";import type {
+import { fetchAdminEvents, fetchAdminPartners } from "@/lib/admin-api";
+import { seedPartners, mockEvents } from "@/lib/seed-data";
+import type {
   Partner,
   PartnerPortalDocument,
   PartnerSeminarSpeakerSubmission,
+  Event,
 } from "@/lib/types";
 
 /** In-memory partner store — seed first, then merged with Admin API partners */
 let partnersStore: Partner[] = structuredClone(seedPartners);
-let adminMerged = false;
+let eventsStore: Event[] = structuredClone(mockEvents);
 
 export async function mergeAdminPartners() {
-  if (adminMerged) return;
   const fromAdmin = await fetchAdminPartners();
   for (const adminPartner of fromAdmin) {
     const login = adminPartner.portalLogin?.toLowerCase();
@@ -25,7 +26,11 @@ export async function mergeAdminPartners() {
       partnersStore.push(adminPartner);
     }
   }
-  adminMerged = true;
+
+  const fromAdminEvents = await fetchAdminEvents();
+  if (fromAdminEvents.length > 0) {
+    eventsStore = fromAdminEvents;
+  }
 }
 export function reloadPartnerStoreFromSeed() {
   partnersStore = structuredClone(seedPartners);
@@ -102,10 +107,11 @@ export function setSeminarSpeakers(
 }
 
 export function getEvents() {
-  return [...mockEvents];
+  return [...eventsStore];
 }
 
 /** Reset store to seed (dev helper) */
 export function resetPartnerStore() {
   partnersStore = structuredClone(seedPartners);
+  eventsStore = structuredClone(mockEvents);
 }

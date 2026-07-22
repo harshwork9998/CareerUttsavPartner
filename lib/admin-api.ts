@@ -1,4 +1,4 @@
-import type { Partner, SponsorshipTier } from "@/lib/types";
+import type { Partner, SponsorshipTier, Event } from "@/lib/types";
 
 const ADMIN_API_URL =
   process.env.ADMIN_API_URL ??
@@ -69,5 +69,48 @@ export async function fetchAdminPartners(): Promise<Partner[]> {
       );
   } catch {
     return [];
+  }
+}
+
+export async function fetchAdminEvents(): Promise<Event[]> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/events`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const raw = (await res.json()) as Event[];
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Fields written by the partner portal — synced back to Admin after each save. */
+export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
+  return {
+    portalDocuments: partner.portalDocuments,
+    portalFasciaName: partner.portalFasciaName,
+    portalWebsiteUrl: partner.portalWebsiteUrl,
+    portalSmsContent: partner.portalSmsContent,
+    portalSeminarSpeakers: partner.portalSeminarSpeakers,
+    portalTempPassword: partner.portalTempPassword,
+    portalPasswordChangedAt: partner.portalPasswordChangedAt,
+  };
+}
+
+export async function patchAdminPartner(
+  id: string,
+  patch: Partial<Partner>
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/partners/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+      cache: "no-store",
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }

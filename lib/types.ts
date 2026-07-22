@@ -27,6 +27,7 @@ export interface PartnerSeminarSlotAssignment {
   eventId: string;
   seminarId: string;
   slots: number;
+  seminarTitle?: string;
 }
 
 export type PartnerPortalDocumentKind =

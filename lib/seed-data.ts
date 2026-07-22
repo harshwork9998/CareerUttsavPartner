@@ -37,6 +37,14 @@ export const mockEvents: Event[] = [
         endTime: "11:00",
         hall: 1,
       },
+      {
+        id: "sem-001-d",
+        title: "Medicine in the 21st century",
+        date: "2026-08-16",
+        startTime: "14:00",
+        endTime: "15:00",
+        hall: 3,
+      },
     ],
   },
   {

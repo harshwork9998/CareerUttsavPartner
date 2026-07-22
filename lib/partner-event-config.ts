@@ -22,7 +22,7 @@ export function buildEventPackageSummaries(
         const seminar = event.seminars.find((s) => s.id === a.seminarId);
         return {
           id: a.seminarId,
-          title: seminar?.title ?? a.seminarId,
+          title: a.seminarTitle ?? seminar?.title ?? a.seminarId,
           slots: a.slots,
           date: seminar?.date ?? "",
           startTime: seminar?.startTime ?? "",
@@ -49,6 +49,18 @@ export function buildEventPackageSummaries(
     });
   }
   return rows;
+}
+
+export function enrichSeminarSlotAssignments(
+  assignments: PartnerSeminarSlotAssignment[],
+  events: Event[]
+): PartnerSeminarSlotAssignment[] {
+  return assignments.map((a) => {
+    if (a.seminarTitle?.trim()) return a;
+    const event = events.find((e) => e.id === a.eventId);
+    const seminar = event?.seminars.find((s) => s.id === a.seminarId);
+    return seminar?.title ? { ...a, seminarTitle: seminar.title } : a;
+  });
 }
 
 export function resolveEventPartnerships(partner: Partner): PartnerEventPartnership[] {
