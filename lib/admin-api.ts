@@ -74,7 +74,7 @@ export async function fetchAdminPartners(): Promise<Partner[]> {
 
 export async function fetchAdminEvents(): Promise<Event[]> {
   try {
-    const res = await fetch(`${ADMIN_API_URL}/api/events`, {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/events`, {
       cache: "no-store",
     });
     if (!res.ok) return [];

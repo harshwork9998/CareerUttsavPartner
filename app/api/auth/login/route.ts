@@ -16,7 +16,8 @@ export async function POST(request: Request) {
 
   await mergeAdminPartners();
 
-  const partner = getPartnerByLogin(login);  if (!partner?.portalInviteSentAt) {
+  const partner = getPartnerByLogin(login);
+  if (!partner?.portalInviteSentAt) {
     return NextResponse.json(
       { error: "Partner access has not been activated yet" },
       { status: 401 }

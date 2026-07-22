@@ -289,7 +289,8 @@ export function findPartnerByCredentials(login: string, password: string) {
   const normalized = login.trim().toLowerCase();
   return seedPartners.find(
     (p) =>
-      p.portalLogin?.toLowerCase() === normalized &&
+      (p.portalLogin?.toLowerCase() === normalized ||
+        p.portalInviteEmail?.toLowerCase() === normalized) &&
       (p.portalTempPassword === password ||
         (p.portalPasswordChangedAt && p.portalTempPassword === password))
   );

@@ -16,9 +16,12 @@ export async function mergeAdminPartners() {
   const fromAdmin = await fetchAdminPartners();
   for (const adminPartner of fromAdmin) {
     const login = adminPartner.portalLogin?.toLowerCase();
-    if (!login) continue;
+    const inviteEmail = adminPartner.portalInviteEmail?.toLowerCase();
     const idx = partnersStore.findIndex(
-      (p) => p.portalLogin?.toLowerCase() === login
+      (p) =>
+        p.id === adminPartner.id ||
+        (login && p.portalLogin?.toLowerCase() === login) ||
+        (inviteEmail && p.portalInviteEmail?.toLowerCase() === inviteEmail)
     );
     if (idx >= 0) {
       partnersStore[idx] = { ...partnersStore[idx], ...adminPartner };
@@ -47,8 +50,11 @@ export function getPartnerById(id: string) {
 export function getPartnerByLogin(login: string) {
   const normalized = login.trim().toLowerCase();
   return (
-    partnersStore.find((p) => p.portalLogin?.toLowerCase() === normalized) ??
-    null
+    partnersStore.find(
+      (p) =>
+        p.portalLogin?.toLowerCase() === normalized ||
+        p.portalInviteEmail?.toLowerCase() === normalized
+    ) ?? null
   );
 }
 
