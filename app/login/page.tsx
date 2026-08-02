@@ -1,9 +1,5 @@
 import { redirect } from "next/navigation";
-import {
-  getPartnerById,
-  getPartnerByLogin,
-  mergeAdminPartners,
-} from "@/lib/partner-store";
+import { getPartnerForSession, mergeAdminPartners } from "@/lib/partner-store";
 import { getSession } from "@/lib/session";
 import { LoginView } from "@/features/login/login-view";
 
@@ -16,8 +12,7 @@ export default async function LoginPage({
   const session = await getSession();
   if (session) {
     await mergeAdminPartners();
-    const partner =
-      getPartnerById(session.partnerId) ?? getPartnerByLogin(session.login);
+    const partner = getPartnerForSession(session);
     if (partner) redirect("/dashboard");
     redirect("/api/auth/logout");
   }

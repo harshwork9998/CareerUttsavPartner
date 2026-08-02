@@ -3,7 +3,7 @@ import { patchAdminPartner, pickPortalSyncPatch } from "@/lib/admin-api";
 import {
   getEvents,
   getPartnerById,
-  getPartnerByLogin,
+  getPartnerForSession,
   bumpPartnerAuthVersion,
   mergeAdminPartners,
   setSeminarSpeakers,
@@ -19,12 +19,6 @@ import {
 import { getSession, withSession, withoutSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
 import type { PartnerPortalDocument } from "@/lib/types";
-
-function resolveSessionPartner(session: { partnerId: string; login: string }) {
-  return (
-    getPartnerById(session.partnerId) ?? getPartnerByLogin(session.login)
-  );
-}
 
 function invalidSessionResponse() {
   // Clear the cookie so /login does not bounce straight back to /dashboard.
@@ -42,7 +36,7 @@ export async function GET() {
   try {
     await mergeAdminPartners();
 
-    const partner = resolveSessionPartner(session);
+    const partner = getPartnerForSession(session);
     if (!partner) {
       return invalidSessionResponse();
     }
@@ -93,7 +87,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const partner = resolveSessionPartner(session);
+  const partner = getPartnerForSession(session);
   if (!partner) {
     return invalidSessionResponse();
   }

@@ -103,6 +103,30 @@ export function getPartnerByLogin(login: string) {
   );
 }
 
+/** True only when the session login still belongs to this exact partner. */
+export function partnerOwnsLogin(partner: Partner, login: string) {
+  const normalized = login.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    partner.portalLogin?.toLowerCase() === normalized ||
+    partner.portalInviteEmail?.toLowerCase() === normalized
+  );
+}
+
+/**
+ * Resolve the partner for a session. Never fall back to another partner by
+ * login alone — that could open the wrong portal after an id remap/delete.
+ */
+export function getPartnerForSession(session: {
+  partnerId: string;
+  login: string;
+}) {
+  const partner = getPartnerById(session.partnerId);
+  if (!partner) return null;
+  if (!partnerOwnsLogin(partner, session.login)) return null;
+  return partner;
+}
+
 export function bumpPartnerAuthVersion(id: string) {
   const partner = getPartnerById(id);
   if (!partner) return null;

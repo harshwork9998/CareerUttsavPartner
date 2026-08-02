@@ -35,9 +35,10 @@ export async function getSession(): Promise<PortalSession | null> {
   const session = decodeSession(raw);
   if (!session?.partnerId || !session?.login) return null;
 
-  // Reject sessions issued before a password change/reset
-  const { getPartnerById } = await import("@/lib/partner-store");
-  const partner = getPartnerById(session.partnerId);
+  // Reject sessions issued before a password change/reset, and reject if the
+  // cookie's login no longer belongs to that partnerId (prevents cross-tenant).
+  const { getPartnerForSession } = await import("@/lib/partner-store");
+  const partner = getPartnerForSession(session);
   if (!partner) return null;
   const currentVersion = partner.portalAuthVersion ?? 0;
   if ((session.authVersion ?? 0) !== currentVersion) return null;
