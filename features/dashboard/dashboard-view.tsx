@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -11,13 +11,14 @@ import { PackageSection } from "@/features/dashboard/package-section";
 import { SeminarSection } from "@/features/dashboard/seminar-section";
 import { SubmissionsSection } from "@/features/dashboard/submissions-section";
 import { PasswordModal } from "@/features/dashboard/password-modal";
-import { partnerInitials, readFileAsDataUrl } from "@/lib/utils";
+import { readFileAsDataUrl } from "@/lib/utils";
 import type { EventPackageSummary, Partner } from "@/lib/types";
 
 type DashboardPayload = {
   partner: Partner;
   packages: EventPackageSummary[];
   mustChangePassword: boolean;
+  forcePasswordPrompt: boolean;
   uploadStatus: ReturnType<
     typeof import("@/lib/partner-portal-docs").getPartnerPortalUploadStatus
   >;
@@ -38,12 +39,26 @@ async function fetchDashboard(): Promise<DashboardPayload> {
 export function DashboardView() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordAllowLater, setPasswordAllowLater] = useState(false);
 
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["partner-dashboard"],
     queryFn: fetchDashboard,
     retry: false,
   });
+
+  useEffect(() => {
+    if (data?.forcePasswordPrompt) {
+      setPasswordOpen(true);
+      setPasswordAllowLater(true);
+    }
+  }, [data?.forcePasswordPrompt]);
+
+  const openChangePassword = () => {
+    setPasswordAllowLater(false);
+    setPasswordOpen(true);
+  };
 
   const logout = async () => {
     await fetch("/api/auth/logout", {
@@ -127,7 +142,7 @@ export function DashboardView() {
     );
   }
 
-  const { partner, packages, uploadStatus, mustChangePassword } = data;
+  const { partner, packages, uploadStatus } = data;
   const logoDoc = partner.portalDocuments?.find((d) => d.kind === "logo");
 
   return (
@@ -152,32 +167,27 @@ export function DashboardView() {
         </div>
       </div>
 
-      <header className="sticky top-8 z-50 pt-4">
-        <div className="cu-wrap">
-          <div className="flex items-center justify-between gap-4 rounded-full border border-line bg-white/80 px-3 py-2.5 shadow-card backdrop-blur-xl sm:px-4">
-            <div className="flex items-center gap-3 pl-1">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-ink font-display text-sm font-bold text-white">
-                CU
-              </div>
-              <div className="hidden sm:block">
-                <p className="font-display text-lg font-bold leading-none">
-                  Career Uttsav
-                </p>
-                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
-                  Partner portal
-                </p>
-              </div>
-            </div>
+      <header className="cu-nav sticky top-8 z-50 pt-4">
+        <div className="cu-wrap relative z-10 grid grid-cols-[auto_1fr] items-center gap-4 sm:gap-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/career-uttsav-logo.png"
+            alt="Career Uttsav"
+            className="h-14 w-auto sm:h-16 lg:h-[68px]"
+          />
 
-            <div className="flex items-center gap-2">
-              <div className="hidden items-center gap-2 rounded-full bg-paper-dim py-1 pl-1 pr-3 md:flex">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-cu-red text-[11px] font-extrabold text-white">
-                  {partnerInitials(partner.name)}
-                </span>
-                <span className="max-w-[150px] truncate text-sm font-semibold">
-                  {partner.name}
-                </span>
-              </div>
+          <div className="cu-nav-pill flex min-w-0 items-center justify-between gap-2 px-2.5 py-2 sm:gap-4 sm:px-4 sm:py-2.5 sm:pl-5">
+            <p className="min-w-0 truncate pl-1 text-sm font-semibold text-ink sm:pl-0 sm:text-base">
+              {partner.name}
+            </p>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={openChangePassword}
+                className="h-10 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink-soft transition hover:border-ink hover:text-ink sm:px-4 sm:text-sm"
+              >
+                Change password
+              </button>
               <button
                 type="button"
                 onClick={logout}
@@ -190,11 +200,10 @@ export function DashboardView() {
         </div>
       </header>
 
-      <main className="cu-wrap pb-20 pt-10 sm:pt-12">
+      <main className="cu-wrap pb-20 pt-14 sm:pt-16">
         <HeroSection
           partner={partner}
           packages={packages}
-          uploadStatus={uploadStatus}
           logoUrl={logoDoc?.url}
           onLogoUpload={async (file) => {
             const url = await readFileAsDataUrl(file);
@@ -206,6 +215,12 @@ export function DashboardView() {
               mimeType: file.type,
               url,
               fileSizeBytes: file.size,
+            });
+          }}
+          onLogoRemove={async () => {
+            await patchMutation.mutateAsync({
+              action: "remove_document",
+              kind: "logo",
             });
           }}
           saving={patchMutation.isPending}
@@ -226,6 +241,7 @@ export function DashboardView() {
             <SubmissionsSection
               partner={partner}
               packages={packages}
+              uploadStatus={uploadStatus}
               saving={patchMutation.isPending}
               onSaveText={async (field, value) => {
                 await patchMutation.mutateAsync({
@@ -260,28 +276,54 @@ export function DashboardView() {
 
         <footer className="mt-16 border-t border-line pt-8 text-center">
           <p className="font-display text-2xl font-bold tracking-tight">
-            Your future doesn&apos;t wait.{" "}
-            <em className="not-italic text-cu-red">Neither should your assets.</em>
+            Finish the checklist above.{" "}
+            <em className="not-italic text-cu-red">We&apos;ll handle production from there.</em>
           </p>
-          <p className="mt-3 text-sm font-medium text-ink-soft">
-            Need help?{" "}
+          <p className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm font-medium text-ink-soft">
+            <span>Need help?</span>
             <a
               href="mailto:info@careeruttsav.in"
-              className="font-bold text-cu-red hover:underline"
+              className="inline-flex items-center gap-1.5 font-bold text-cu-red hover:underline"
             >
+              <Mail className="h-4 w-4" strokeWidth={2.25} />
               info@careeruttsav.in
+            </a>
+            <a
+              href="tel:+919113064877"
+              className="inline-flex items-center gap-1.5 font-bold text-cu-red hover:underline"
+            >
+              <Phone className="h-4 w-4" strokeWidth={2.25} />
+              9113064877
             </a>
           </p>
         </footer>
       </main>
 
       <PasswordModal
-        open={mustChangePassword}
+        open={passwordOpen}
+        allowLater={passwordAllowLater}
+        onClose={
+          passwordAllowLater
+            ? undefined
+            : () => {
+                setPasswordOpen(false);
+              }
+        }
+        onLater={async () => {
+          await patchMutation.mutateAsync({
+            action: "skip_password_prompt",
+          });
+          setPasswordOpen(false);
+          setPasswordAllowLater(false);
+          refresh();
+        }}
         onSave={async (password) => {
           await patchMutation.mutateAsync({
             action: "change_password",
             password,
           });
+          setPasswordOpen(false);
+          setPasswordAllowLater(false);
           refresh();
         }}
       />

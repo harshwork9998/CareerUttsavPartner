@@ -9,6 +9,7 @@ import {
   setSeminarSpeakers,
   updatePartner,
   upsertPortalDocument,
+  removePortalDocument,
 } from "@/lib/partner-store";
 import {
   buildEventPackageSummaries,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/partner-event-config";
 import { getSession, withSession, withoutSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
+import type { PartnerPortalDocument } from "@/lib/types";
 
 function resolveSessionPartner(session: { partnerId: string; login: string }) {
   return (
@@ -64,7 +66,10 @@ export async function GET() {
       packages,
       events,
       uploadStatus: getPartnerPortalUploadStatus(partner),
-      mustChangePassword: session.mustChangePassword,
+      mustChangePassword: !partner.portalPasswordChangedAt,
+      forcePasswordPrompt:
+        !partner.portalPasswordChangedAt &&
+        !partner.portalPasswordPromptSkippedAt,
     });
   } catch (err) {
     console.error("[api/partner GET]", err);
@@ -91,6 +96,16 @@ export async function PATCH(request: Request) {
   const partner = resolveSessionPartner(session);
   if (!partner) {
     return invalidSessionResponse();
+  }
+
+  if (body.action === "skip_password_prompt") {
+    if (!partner.portalPasswordChangedAt) {
+      updatePartner(partner.id, {
+        portalPasswordPromptSkippedAt: new Date().toISOString(),
+      });
+      await syncPartnerPortalToAdmin(partner.id);
+    }
+    return NextResponse.json({ ok: true });
   }
 
   if (body.action === "change_password") {
@@ -137,6 +152,16 @@ export async function PATCH(request: Request) {
       url,
       fileSizeBytes: Number(fileSizeBytes) || 0,
     });
+    await syncPartnerPortalToAdmin(partner.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "remove_document") {
+    const kind = body.kind as PartnerPortalDocument["kind"] | undefined;
+    if (!kind) {
+      return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
+    }
+    removePortalDocument(partner.id, kind);
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }

@@ -79,9 +79,9 @@ export function LoginView({
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 22, rotate: 1 }}
-          animate={{ opacity: 1, y: 0, rotate: 0 }}
-          transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 0.84, 0.44, 1] }}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.08, ease: [0.16, 0.84, 0.44, 1] }}
           className="w-full max-w-[380px] justify-self-center lg:justify-self-end"
         >
           <form

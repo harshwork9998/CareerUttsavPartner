@@ -55,6 +55,8 @@ export interface PartnerSeminarSpeakerDetail {
   designation?: string;
   contact?: string;
   introduction?: string;
+  /** Data URL or hosted URL for the speaker headshot. */
+  photoUrl?: string;
   phone?: string;
   email?: string;
 }
@@ -80,6 +82,8 @@ export interface Partner {
   portalLogin?: string;
   portalTempPassword?: string;
   portalPasswordChangedAt?: string;
+  /** Set when the first-login password prompt is dismissed with "I'll do it later". */
+  portalPasswordPromptSkippedAt?: string;
   /** Incremented whenever the portal password changes — invalidates sessions. */
   portalAuthVersion?: number;
   portalInviteEmail?: string;

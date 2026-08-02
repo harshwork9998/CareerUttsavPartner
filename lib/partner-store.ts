@@ -60,6 +60,9 @@ export async function mergeAdminPartners() {
         portalPasswordChangedAt:
           adminPartner.portalPasswordChangedAt ??
           existing.portalPasswordChangedAt,
+        portalPasswordPromptSkippedAt:
+          adminPartner.portalPasswordPromptSkippedAt ??
+          existing.portalPasswordPromptSkippedAt,
         portalAuthVersion:
           adminPartner.portalAuthVersion ?? existing.portalAuthVersion,
       };
@@ -136,6 +139,16 @@ export function upsertPortalDocument(
   };
   if (idx >= 0) docs[idx] = next;
   else docs.push(next);
+  return updatePartner(partnerId, { portalDocuments: docs });
+}
+
+export function removePortalDocument(
+  partnerId: string,
+  kind: PartnerPortalDocument["kind"]
+) {
+  const partner = getPartnerById(partnerId);
+  if (!partner) return null;
+  const docs = (partner.portalDocuments ?? []).filter((d) => d.kind !== kind);
   return updatePartner(partnerId, { portalDocuments: docs });
 }
 

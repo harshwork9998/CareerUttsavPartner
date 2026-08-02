@@ -22,6 +22,8 @@ export const PORTAL_SUBMISSION_ITEMS = [
     type: "file" as const,
     docKind: "souvenir_writeup" as const,
     accept: ".pdf,.doc,.docx",
+    templateUrl: "/templates/souvenir-write-up-format.docx",
+    templateLabel: "Download write-up format",
   },
   {
     key: "ad_creative" as const,
@@ -32,7 +34,7 @@ export const PORTAL_SUBMISSION_ITEMS = [
   },
   {
     key: "sms_content" as const,
-    label: "SMS content (for mailer campaigns to all participants)",
+    label: "SMS content for participant mailers",
     type: "textarea" as const,
     field: "portalSmsContent" as const,
   },
@@ -77,7 +79,14 @@ export function getPartnerPortalUploadStatus(
         (row) =>
           row.eventId === slot.eventId &&
           row.seminarId === slot.seminarId &&
-          row.speakers.some((s) => s.name.trim())
+          row.speakers.some(
+            (s) =>
+              Boolean(s.name.trim()) &&
+              Boolean(s.designation?.trim()) &&
+              Boolean(s.contact?.trim() || s.phone?.trim() || s.email?.trim()) &&
+              Boolean(s.introduction?.trim()) &&
+              Boolean(s.photoUrl?.trim())
+          )
       )
     );
 
