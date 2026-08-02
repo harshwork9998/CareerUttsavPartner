@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPartnerByLogin, mergeAdminPartners } from "@/lib/partner-store";
-import { setSession } from "@/lib/session";
+import { withSession } from "@/lib/session";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { login?: string; password?: string };
@@ -31,14 +31,14 @@ export async function POST(request: Request) {
     );
   }
 
-  await setSession({
-    partnerId: partner.id,
-    login: partner.portalLogin!,
+  const response = NextResponse.json({
+    ok: true,
     mustChangePassword: !partner.portalPasswordChangedAt,
   });
 
-  return NextResponse.json({
-    ok: true,
+  return withSession(response, {
+    partnerId: partner.id,
+    login: partner.portalLogin!,
     mustChangePassword: !partner.portalPasswordChangedAt,
   });
 }

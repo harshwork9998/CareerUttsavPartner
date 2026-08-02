@@ -23,7 +23,7 @@ type DashboardPayload = {
 };
 
 async function fetchDashboard(): Promise<DashboardPayload> {
-  const res = await fetch("/api/partner");
+  const res = await fetch("/api/partner", { credentials: "same-origin" });
   if (res.status === 401) throw new Error("unauthorized");
   if (!res.ok) throw new Error("failed");
   return res.json();
@@ -33,14 +33,19 @@ export function DashboardView() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  // Use isPending (not isLoading): in RQ v5, SSR/hydration can be pending with
+  // fetchStatus idle, so isLoading is false while data is still undefined.
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["partner-dashboard"],
     queryFn: fetchDashboard,
     retry: false,
   });
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    });
     router.replace("/login");
     router.refresh();
   };
@@ -48,11 +53,13 @@ export function DashboardView() {
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ["partner-dashboard"] });
 
+  // Only bounce to login on true auth failure. Other errors used to redirect
+  // too, which looped with /login (session present → back to /dashboard).
   useEffect(() => {
-    if (!isLoading && (isError || !data)) {
+    if (!isPending && error?.message === "unauthorized") {
       router.replace("/login");
     }
-  }, [isLoading, isError, data, router]);
+  }, [isPending, error, router]);
 
   const patchMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
@@ -60,6 +67,7 @@ export function DashboardView() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        credentials: "same-origin",
       });
       if (!res.ok) {
         const err = await res.json();
@@ -71,7 +79,7 @@ export function DashboardView() {
     },
   });
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-brand-700" />
@@ -80,7 +88,36 @@ export function DashboardView() {
   }
 
   if (isError || !data) {
-    return null;
+    if (error?.message === "unauthorized") {
+      return null;
+    }
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-5 text-center">
+        <p className="font-display text-xl font-semibold text-brand-700">
+          Couldn&apos;t load your partner dashboard
+        </p>
+        <p className="max-w-sm text-sm text-ink-secondary">
+          Something went wrong while loading your package. You can retry or sign
+          out and try again.
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="h-10 rounded-full bg-brand-700 px-5 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            className="h-10 rounded-full border border-line-subtle px-5 text-sm font-semibold text-ink-secondary"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const { partner, packages, uploadStatus, mustChangePassword } = data;

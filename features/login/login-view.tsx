@@ -21,6 +21,7 @@ export function LoginView() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ login, password }),
       });
       const data = await res.json();
@@ -28,8 +29,8 @@ export function LoginView() {
         setError(data.error ?? "Sign in failed");
         return;
       }
-      router.replace("/dashboard");
       router.refresh();
+      router.replace("/dashboard");
     } catch {
       setError("Something went wrong. Try again.");
     } finally {

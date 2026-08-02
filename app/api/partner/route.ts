@@ -13,7 +13,7 @@ import {
   enrichSeminarSlotAssignments,
   resolveEventPartnerships,
 } from "@/lib/partner-event-config";
-import { getSession } from "@/lib/session";
+import { getSession, withSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
 
 export async function GET() {
@@ -83,10 +83,10 @@ export async function PATCH(request: Request) {
       portalPasswordChangedAt: new Date().toISOString(),
     });
     await syncPartnerPortalToAdmin(partner.id);
-    await import("@/lib/session").then(({ setSession }) =>
-      setSession({ ...session, mustChangePassword: false })
-    );
-    return NextResponse.json({ ok: true });
+    return withSession(NextResponse.json({ ok: true }), {
+      ...session,
+      mustChangePassword: false,
+    });
   }
 
   if (body.action === "text_field") {

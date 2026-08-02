@@ -1,7 +1,15 @@
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import type { PortalSession } from "@/lib/types";
 
 const COOKIE = "cu_partner_session";
+
+const cookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 60 * 60 * 24 * 7,
+};
 
 export async function getSession(): Promise<PortalSession | null> {
   const jar = await cookies();
@@ -14,17 +22,13 @@ export async function getSession(): Promise<PortalSession | null> {
   }
 }
 
-export async function setSession(session: PortalSession) {
-  const jar = await cookies();
-  jar.set(COOKIE, JSON.stringify(session), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+/** Attach session on the response — required for Route Handlers. */
+export function withSession(response: NextResponse, session: PortalSession) {
+  response.cookies.set(COOKIE, JSON.stringify(session), cookieOptions);
+  return response;
 }
 
-export async function clearSession() {
-  const jar = await cookies();
-  jar.delete(COOKIE);
+export function withoutSession(response: NextResponse) {
+  response.cookies.set(COOKIE, "", { ...cookieOptions, maxAge: 0 });
+  return response;
 }

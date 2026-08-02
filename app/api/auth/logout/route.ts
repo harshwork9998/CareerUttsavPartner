@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { clearSession } from "@/lib/session";
+import { withoutSession } from "@/lib/session";
 
 export async function POST() {
-  await clearSession();
-  return NextResponse.json({ ok: true });
+  return withoutSession(NextResponse.json({ ok: true }));
 }
