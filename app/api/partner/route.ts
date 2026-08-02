@@ -3,6 +3,7 @@ import { patchAdminPartner, pickPortalSyncPatch } from "@/lib/admin-api";
 import {
   getEvents,
   getPartnerById,
+  getPartnerByLogin,
   mergeAdminPartners,
   setSeminarSpeakers,
   updatePartner,
@@ -13,8 +14,21 @@ import {
   enrichSeminarSlotAssignments,
   resolveEventPartnerships,
 } from "@/lib/partner-event-config";
-import { getSession, withSession } from "@/lib/session";
+import { getSession, withSession, withoutSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
+
+function resolveSessionPartner(session: { partnerId: string; login: string }) {
+  return (
+    getPartnerById(session.partnerId) ?? getPartnerByLogin(session.login)
+  );
+}
+
+function invalidSessionResponse() {
+  // Clear the cookie so /login does not bounce straight back to /dashboard.
+  return withoutSession(
+    NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  );
+}
 
 export async function GET() {
   const session = await getSession();
@@ -22,34 +36,42 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await mergeAdminPartners();
+  try {
+    await mergeAdminPartners();
 
-  const partner = getPartnerById(session.partnerId);
-  if (!partner) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const partner = resolveSessionPartner(session);
+    if (!partner) {
+      return invalidSessionResponse();
+    }
+
+    const events = getEvents();
+    const partnerships = resolveEventPartnerships(partner);
+    const slotAssignments = enrichSeminarSlotAssignments(
+      partner.seminarSlotAssignments ?? [],
+      events
+    );
+    const packages = buildEventPackageSummaries(
+      partnerships,
+      slotAssignments,
+      events
+    );
+
+    const { portalTempPassword: _pw, ...safePartner } = partner;
+
+    return NextResponse.json({
+      partner: safePartner,
+      packages,
+      events,
+      uploadStatus: getPartnerPortalUploadStatus(partner),
+      mustChangePassword: session.mustChangePassword,
+    });
+  } catch (err) {
+    console.error("[api/partner GET]", err);
+    return NextResponse.json(
+      { error: "Failed to load partner dashboard" },
+      { status: 500 }
+    );
   }
-
-  const events = getEvents();
-  const partnerships = resolveEventPartnerships(partner);
-  const slotAssignments = enrichSeminarSlotAssignments(
-    partner.seminarSlotAssignments ?? [],
-    events
-  );
-  const packages = buildEventPackageSummaries(
-    partnerships,
-    slotAssignments,
-    events
-  );
-
-  const { portalTempPassword: _pw, ...safePartner } = partner;
-
-  return NextResponse.json({
-    partner: safePartner,
-    packages,
-    events,
-    uploadStatus: getPartnerPortalUploadStatus(partner),
-    mustChangePassword: session.mustChangePassword,
-  });
 }
 
 async function syncPartnerPortalToAdmin(partnerId: string) {
@@ -65,9 +87,9 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const partner = getPartnerById(session.partnerId);
+  const partner = resolveSessionPartner(session);
   if (!partner) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return invalidSessionResponse();
   }
 
   if (body.action === "change_password") {

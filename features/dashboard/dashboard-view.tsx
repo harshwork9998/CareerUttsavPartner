@@ -24,8 +24,13 @@ type DashboardPayload = {
 
 async function fetchDashboard(): Promise<DashboardPayload> {
   const res = await fetch("/api/partner", { credentials: "same-origin" });
-  if (res.status === 401) throw new Error("unauthorized");
-  if (!res.ok) throw new Error("failed");
+  if (res.status === 401) {
+    throw new Error("unauthorized");
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "failed");
+  }
   return res.json();
 }
 
@@ -53,12 +58,23 @@ export function DashboardView() {
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ["partner-dashboard"] });
 
-  // Only bounce to login on true auth failure. Other errors used to redirect
-  // too, which looped with /login (session present → back to /dashboard).
+  // Clear the stale cookie before navigating, otherwise /login sees the session
+  // and immediately redirects back to /dashboard (loop).
   useEffect(() => {
-    if (!isPending && error?.message === "unauthorized") {
+    if (isPending || error?.message !== "unauthorized") return;
+    let cancelled = false;
+    (async () => {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (cancelled) return;
       router.replace("/login");
-    }
+      router.refresh();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isPending, error, router]);
 
   const patchMutation = useMutation({
@@ -97,8 +113,9 @@ export function DashboardView() {
           Couldn&apos;t load your partner dashboard
         </p>
         <p className="max-w-sm text-sm text-ink-secondary">
-          Something went wrong while loading your package. You can retry or sign
-          out and try again.
+          {error?.message && error.message !== "failed"
+            ? error.message
+            : "Something went wrong while loading your package. You can retry or sign out and try again."}
         </p>
         <div className="flex gap-3">
           <button

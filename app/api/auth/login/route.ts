@@ -38,7 +38,8 @@ export async function POST(request: Request) {
 
   return withSession(response, {
     partnerId: partner.id,
-    login: partner.portalLogin!,
+    login:
+      partner.portalLogin ?? partner.portalInviteEmail ?? login.toLowerCase(),
     mustChangePassword: !partner.portalPasswordChangedAt,
   });
 }

@@ -36,7 +36,7 @@ export function buildEventPackageSummaries(
       title: event.title,
       city: event.city,
       tier: ep.sponsorshipTier,
-      deliverables: ep.deliverables
+      deliverables: (ep.deliverables ?? [])
         .filter((d) => d.included)
         .map((d) => ({
           id: d.id,
@@ -67,7 +67,7 @@ export function resolveEventPartnerships(partner: Partner): PartnerEventPartners
   if (partner.eventPartnerships?.length) {
     return partner.eventPartnerships.map((ep) => ({
       ...ep,
-      deliverables: ep.deliverables.map((d) => ({ ...d })),
+      deliverables: (ep.deliverables ?? []).map((d) => ({ ...d })),
     }));
   }
   if (!partner.eventIds.length) return [];
