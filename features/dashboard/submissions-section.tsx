@@ -63,14 +63,15 @@ export function SubmissionsSection({
   );
 
   return (
-    <section className="flex h-full flex-col rounded-3xl border border-line-subtle bg-white p-5 shadow-card sm:p-6">
-      <div className="mb-5">
-        <h2 className="font-display text-xl font-bold text-brand-800">
+    <section className="cu-panel flex h-full flex-col">
+      <div className="mb-6">
+        <p className="cu-eyebrow">Action checklist</p>
+        <h2 className="mt-3 font-display text-[1.85rem] font-bold tracking-tight">
           What we need from you
         </h2>
-        <p className="mt-1 text-sm text-ink-secondary">
-          Share these details so our production team can prepare venue branding,
-          souvenir, and seminar rosters.
+        <p className="mt-2 text-sm font-medium leading-relaxed text-ink-soft">
+          Share these details so production can prepare venue branding, souvenir,
+          and seminar rosters.
         </p>
       </div>
 
@@ -137,7 +138,7 @@ export function SubmissionsSection({
               return (
                 <div
                   key={item.key}
-                  className="rounded-2xl border border-dashed border-line-strong bg-paper-page px-4 py-4 text-sm text-ink-muted"
+                  className="rounded-2xl border border-dashed border-line bg-paper-dim/60 px-4 py-4 text-sm text-ink-muted"
                 >
                   {item.label} — available when seminar seats are allotted.
                 </div>
@@ -146,7 +147,7 @@ export function SubmissionsSection({
             return (
               <div key={item.key} className="space-y-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                  <Mic2 className="h-4 w-4 text-brand-700" />
+                  <Mic2 className="h-4 w-4 text-cu-red" />
                   {item.label}
                 </p>
                 {seminars.map((seminar) => {
@@ -209,16 +210,18 @@ function TextFieldCard({
   return (
     <div
       className={`rounded-2xl border px-4 py-3.5 transition ${
-        done ? "border-success/30 bg-success-soft/20" : "border-line-subtle bg-paper-page"
+        done
+          ? "border-cu-green/25 bg-cu-green-soft/40"
+          : "border-line bg-paper"
       }`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 shrink-0 text-brand-700" />
+          <Icon className="h-4 w-4 shrink-0 text-cu-red" />
           <p className="text-sm font-semibold text-ink">{label}</p>
         </div>
         {done ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-success">
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cu-green">
             <Check className="h-3 w-3" strokeWidth={3} /> Saved
           </span>
         ) : null}
@@ -228,14 +231,14 @@ function TextFieldCard({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={placeholder}
-        className="h-11 w-full rounded-xl border border-line-strong bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-700/10"
+        className="cu-input"
       />
       {dirty ? (
         <button
           type="button"
           disabled={saving || !draft.trim()}
           onClick={() => void onSave(draft.trim())}
-          className="mt-2 h-9 rounded-full bg-brand-700 px-4 text-xs font-semibold text-white disabled:opacity-50"
+          className="mt-2 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white disabled:opacity-50"
         >
           Save
         </button>
@@ -267,16 +270,18 @@ function TextAreaCard({
   return (
     <div
       className={`rounded-2xl border px-4 py-3.5 ${
-        done ? "border-success/30 bg-success-soft/20" : "border-line-subtle bg-paper-page"
+        done
+          ? "border-cu-green/25 bg-cu-green-soft/40"
+          : "border-line bg-paper"
       }`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-brand-700" />
+          <MessageSquare className="h-4 w-4 text-cu-red" />
           <p className="text-sm font-semibold text-ink">{label}</p>
         </div>
         {done ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-success">
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cu-green">
             <Check className="h-3 w-3" strokeWidth={3} /> Saved
           </span>
         ) : null}
@@ -287,7 +292,7 @@ function TextAreaCard({
         rows={4}
         maxLength={320}
         placeholder="Short SMS copy for participant mailers (max 320 chars)…"
-        className="w-full resize-y rounded-xl border border-line-strong bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-700/10"
+        className="w-full resize-y rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-cu-blue focus:ring-2 focus:ring-cu-blue/15"
       />
       <p className="mt-1 text-[11px] text-ink-muted">{draft.length}/320</p>
       {dirty ? (
@@ -295,7 +300,7 @@ function TextAreaCard({
           type="button"
           disabled={saving || !draft.trim()}
           onClick={() => void onSave(draft.trim())}
-          className="mt-2 h-9 rounded-full bg-brand-700 px-4 text-xs font-semibold text-white disabled:opacity-50"
+          className="mt-2 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white disabled:opacity-50"
         >
           Save SMS
         </button>
@@ -321,10 +326,10 @@ function FileUploadCard({
 }) {
   return (
     <label
-      className={`block cursor-pointer rounded-2xl border-2 border-dashed px-4 py-4 transition hover:border-brand-500 hover:bg-brand-50/50 ${
+      className={`block cursor-pointer rounded-2xl border-2 border-dashed px-4 py-4 transition hover:border-cu-red hover:bg-cu-red-soft/40 ${
         done
-          ? "border-success/35 bg-success-soft/10"
-          : "border-line-strong bg-paper-page"
+          ? "border-cu-green/35 bg-cu-green-soft/30"
+          : "border-line-strong bg-paper"
       }`}
     >
       <input
@@ -338,7 +343,7 @@ function FileUploadCard({
         }}
       />
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-brand-700 shadow-sm">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-cu-red shadow-sm">
           {done ? <FileUp className="h-5 w-5" /> : <Upload className="h-5 w-5" />}
         </span>
         <div className="min-w-0 flex-1">
@@ -350,7 +355,7 @@ function FileUploadCard({
           </p>
         </div>
         {done ? (
-          <Check className="h-4 w-4 shrink-0 text-success" strokeWidth={3} />
+          <Check className="h-4 w-4 shrink-0 text-cu-green" strokeWidth={3} />
         ) : null}
       </div>
     </label>
@@ -410,7 +415,7 @@ function SpeakerCard({
   };
 
   return (
-    <div className="rounded-2xl border border-line-subtle bg-paper-page p-4">
+    <div className="rounded-2xl border border-line bg-paper p-4">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-ink">{seminarTitle}</p>
@@ -419,35 +424,35 @@ function SpeakerCard({
           </p>
         </div>
         {done ? (
-          <span className="text-[11px] font-bold text-success">Saved</span>
+          <span className="text-[11px] font-bold text-cu-green">Saved</span>
         ) : null}
       </div>
       <div className="space-y-4">
         {speakers.map((speaker, i) => (
           <div
             key={i}
-            className="space-y-2.5 rounded-xl border border-line-subtle bg-white p-3.5"
+            className="space-y-2.5 rounded-xl border border-line bg-white p-3.5"
           >
-            <p className="text-[11px] font-bold uppercase tracking-wide text-brand-700">
+            <p className="text-[11px] font-extrabold uppercase tracking-wide text-cu-red">
               Speaker {i + 1}
             </p>
             <input
               placeholder="Name *"
               value={speaker.name}
               onChange={(e) => patchSpeaker(i, { name: e.target.value })}
-              className="h-10 w-full rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
+              className="cu-input !h-10"
             />
             <input
               placeholder="Designation"
               value={speaker.designation ?? ""}
               onChange={(e) => patchSpeaker(i, { designation: e.target.value })}
-              className="h-10 w-full rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
+              className="cu-input !h-10"
             />
             <input
               placeholder="Contact (phone or email)"
               value={speaker.contact ?? ""}
               onChange={(e) => patchSpeaker(i, { contact: e.target.value })}
-              className="h-10 w-full rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-brand-500"
+              className="cu-input !h-10"
             />
             <div>
               <textarea
@@ -458,7 +463,7 @@ function SpeakerCard({
                 onChange={(e) =>
                   patchSpeaker(i, { introduction: e.target.value })
                 }
-                className="w-full resize-y rounded-lg border border-line-strong px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+                className="w-full resize-y rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none focus:border-cu-blue"
               />
               <p className="mt-1 text-right text-[11px] tabular-nums text-ink-muted">
                 {(speaker.introduction ?? "").length}/1000
@@ -471,7 +476,7 @@ function SpeakerCard({
         type="button"
         disabled={saving || !speakers.some((s) => s.name.trim())}
         onClick={() => void onSave(speakers.filter((s) => s.name.trim()))}
-        className="mt-3 h-9 rounded-full bg-brand-700 px-4 text-xs font-semibold text-white disabled:opacity-50"
+        className="mt-3 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white disabled:opacity-50"
       >
         Save speakers
       </button>

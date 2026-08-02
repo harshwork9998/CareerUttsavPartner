@@ -1,17 +1,27 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 
-import { MULTI_EVENT_DEMO } from "@/lib/seed-data";
-
-export function LoginView() {
+export function LoginView({
+  resetSuccess = false,
+}: {
+  resetSuccess?: boolean;
+}) {
   const router = useRouter();
-  const [login, setLogin] = useState<string>(MULTI_EVENT_DEMO.login);
-  const [password, setPassword] = useState<string>(MULTI_EVENT_DEMO.password);
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [successMessage] = useState(
+    resetSuccess
+      ? "Your password has been reset successfully. Please sign in."
+      : ""
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,109 +49,156 @@ export function LoginView() {
   };
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
-      <aside className="relative flex min-h-[42vh] flex-col justify-end overflow-hidden bg-brand-950 p-8 text-white lg:min-h-screen lg:p-14">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-90"
-          style={{
-            background:
-              "linear-gradient(165deg, rgba(11,22,40,0.88) 0%, rgba(31,56,100,0.78) 55%, rgba(138,106,47,0.45) 100%)",
-          }}
-        />
-        <div className="relative z-10 mb-auto flex items-center gap-3 pt-2">
-          <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-brass-500 to-[#E0C988] font-display text-lg font-bold text-brand-950">
-            CU
-          </div>
-          <div>
-            <p className="font-display text-xl font-semibold leading-tight">
-              Career Uttsav
-            </p>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">
-              K2 Group
-            </p>
-          </div>
-        </div>
-        <div className="relative z-10">
-          <h1 className="max-w-[11ch] font-display text-4xl font-bold leading-[1.05] sm:text-5xl lg:text-6xl">
-            Your partnership, all in one place.
-          </h1>
-          <p className="mt-4 max-w-md text-base leading-relaxed text-white/78">
-            Review your package, manage seminar seats, and share brand assets
-            for Career Uttsav.
-          </p>
-        </div>
-      </aside>
+    <div className="relative h-dvh overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-paper/70 via-transparent to-paper" />
 
-      <div className="flex items-center justify-center p-6 sm:p-10">
-        <form
-          onSubmit={submit}
-          className="w-full max-w-[420px] animate-fade-rise rounded-4xl border border-line-subtle bg-paper-surface p-8 shadow-soft"
+      <div className="cu-wrap relative z-10 grid h-full items-center gap-8 py-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: [0.16, 0.84, 0.44, 1] }}
+          className="max-w-xl"
         >
-          <h2 className="font-display text-3xl font-bold text-brand-700">
-            Partner Login
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed text-ink-secondary">
-            Sign in with the credentials emailed by Team Career Uttsav.
+          <div className="mb-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/career-uttsav-logo.png"
+              alt="Career Uttsav"
+              className="h-20 w-auto sm:h-24 lg:h-28"
+            />
+          </div>
+
+          <h1 className="font-display text-[clamp(2.1rem,4.8vw,3.75rem)] font-bold leading-[0.98] tracking-[-0.02em]">
+            Your dedicated{" "}
+            <em className="not-italic text-cu-red">event workspace</em>
+          </h1>
+          <p className="mt-4 max-w-md text-base font-medium leading-relaxed text-ink-soft">
+            Track sponsorship deliverables, upload marketing assets and manage
+            seminar details through your dedicated Partner Portal.
           </p>
+        </motion.div>
 
-          {error ? (
-            <p className="mt-4 text-sm font-semibold text-red-700">{error}</p>
-          ) : null}
-
-          <div className="mt-6 space-y-4">
-            <div>
-              <label
-                htmlFor="login"
-                className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-secondary"
-              >
-                Login
-              </label>
-              <input
-                id="login"
-                type="email"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                required
-                className="h-12 w-full rounded-xl border border-line-strong bg-paper-page px-4 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-700/10"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-secondary"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="h-12 w-full rounded-xl border border-line-strong bg-paper-page px-4 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-700/10"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-5 flex h-12 w-full items-center justify-center rounded-full bg-brand-700 font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
+        <motion.div
+          initial={{ opacity: 0, y: 22, rotate: 1 }}
+          animate={{ opacity: 1, y: 0, rotate: 0 }}
+          transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 0.84, 0.44, 1] }}
+          className="w-full max-w-[380px] justify-self-center lg:justify-self-end"
+        >
+          <form
+            onSubmit={submit}
+            className="relative overflow-hidden rounded-[22px] bg-ink px-6 py-5 text-white shadow-soft sm:px-7 sm:py-6"
           >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign in"}
-          </button>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl font-bold leading-none">
+                  Partner login
+                </h2>
+              </div>
+              <span className="rounded-full bg-cu-red px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em]">
+                Portal
+              </span>
+            </div>
 
-          <div className="mt-5 rounded-2xl border border-brass-500/30 bg-brass-100/60 px-4 py-3 text-xs leading-relaxed text-ink-secondary">
-            <strong className="text-brass-700">3-event layout demo:</strong>{" "}
-            Christ University —{" "}
-            <code className="text-[11px]">{MULTI_EVENT_DEMO.login}</code> /{" "}
-            <code className="text-[11px]">{MULTI_EVENT_DEMO.password}</code>
-            <span className="mt-1 block text-[11px] text-ink-muted">
-              Bangalore · Mysore · Hubli — separate packages, tiers &amp; seminars
-            </span>
-          </div>
-        </form>
+            <p className="mb-4 text-xs leading-relaxed text-white/60">
+              Sign in with the credentials sent to you by the Career Uttsav team.
+            </p>
+
+            <div className="relative mb-4 border-t-2 border-dashed border-white/20">
+              <span className="absolute -left-9 -top-[9px] h-[18px] w-[18px] rounded-full bg-paper" />
+              <span className="absolute -right-9 -top-[9px] h-[18px] w-[18px] rounded-full bg-paper" />
+            </div>
+
+            {successMessage ? (
+              <p className="mb-3 rounded-lg border border-cu-yellow/30 bg-cu-yellow/10 px-3 py-2 text-xs font-semibold leading-relaxed text-cu-yellow">
+                {successMessage}
+              </p>
+            ) : null}
+
+            {error ? (
+              <p className="mb-3 rounded-lg bg-cu-red/20 px-3 py-1.5 text-xs font-semibold text-[#ffb4ae]">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="space-y-3">
+              <div>
+                <label
+                  htmlFor="login"
+                  className="mb-1 block text-[10px] font-bold uppercase tracking-[0.1em] text-white/50"
+                >
+                  Login
+                </label>
+                <input
+                  id="login"
+                  type="email"
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                  required
+                  className="h-10 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-cu-yellow focus:bg-white/10"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-1 block text-[10px] font-bold uppercase tracking-[0.1em] text-white/50"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="h-10 w-full rounded-lg border border-white/10 bg-white/5 px-3 pr-10 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-cu-yellow focus:bg-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-white/50 transition hover:text-white"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                <div className="mt-2 text-right">
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs font-semibold text-white/55 transition hover:text-cu-yellow"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-4 flex h-10 w-full items-center justify-center rounded-full bg-cu-red text-sm font-bold text-white shadow-red transition hover:-translate-y-0.5 hover:bg-cu-red-dark disabled:opacity-60"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Enter workspace"
+              )}
+            </button>
+
+            <div
+              className="mt-4 h-5 opacity-70"
+              style={{
+                background:
+                  "repeating-linear-gradient(90deg, #fff 0 2px, transparent 2px 5px, #fff 5px 6px, transparent 6px 10px)",
+              }}
+            />
+          </form>
+        </motion.div>
       </div>
     </div>
   );

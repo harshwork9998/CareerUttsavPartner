@@ -14,63 +14,63 @@ export function SeminarSection({
   const totalSeats = packages.reduce((s, p) => s + p.seatsAssigned, 0);
 
   return (
-    <section className="rounded-3xl border border-line-subtle bg-white p-5 shadow-card sm:p-6">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-700">
-            <Mic2 className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="font-display text-xl font-bold text-brand-800">
-              Seminar details
-            </h2>
-            <p className="text-sm text-ink-secondary">
-              Panelist seats allotted across your events.
-            </p>
-          </div>
+    <section className="cu-panel">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="cu-eyebrow">Stage time</p>
+          <h2 className="mt-3 flex items-center gap-2 font-display text-[1.85rem] font-bold tracking-tight">
+            <Mic2 className="h-6 w-6 text-cu-red" />
+            Seminar seats
+          </h2>
+          <p className="mt-2 text-sm font-medium text-ink-soft">
+            Panelist seats allotted across your events.
+          </p>
         </div>
         {totalSeats > 0 ? (
-          <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold tabular-nums text-brand-700">
-            {totalSeats} seat{totalSeats === 1 ? "" : "s"} · {packagesWithSeminars.length}{" "}
-            event{packagesWithSeminars.length === 1 ? "" : "s"}
+          <span className="rounded-full bg-cu-red-soft px-3.5 py-1.5 text-xs font-extrabold tabular-nums text-cu-red-dark">
+            {totalSeats} seat{totalSeats === 1 ? "" : "s"} ·{" "}
+            {packagesWithSeminars.length} event
+            {packagesWithSeminars.length === 1 ? "" : "s"}
           </span>
         ) : null}
       </div>
 
       {packagesWithSeminars.length === 0 ? (
-        <div className="rounded-2xl bg-paper-muted px-4 py-4 text-sm leading-relaxed text-ink-secondary">
+        <div className="rounded-2xl border border-dashed border-line bg-paper-dim/70 px-5 py-5 text-sm leading-relaxed text-ink-soft">
           No seminar seats were allotted for this partnership. Your package
           benefits still apply — focus on sharing the required brand assets.
         </div>
-      ) : packages.length > 1 ? (
-        <div className="space-y-5">
+      ) : (
+        <div className="space-y-6">
           {packagesWithSeminars.map((pkg) => (
             <div key={pkg.eventId}>
-              <div className="mb-2.5 flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-brand-700" />
-                <p className="text-xs font-bold uppercase tracking-wide text-brand-700">
-                  {pkg.city}
-                </p>
-                <span className="text-xs text-ink-muted">·</span>
-                <p className="truncate text-xs font-semibold text-ink-secondary">
-                  {pkg.title}
-                </p>
-              </div>
-              <ul className="space-y-2.5">
+              {packages.length > 1 ? (
+                <div className="mb-3 flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-cu-red" />
+                  <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-cu-red">
+                    {pkg.city}
+                  </p>
+                  <span className="text-ink-muted">·</span>
+                  <p className="truncate text-xs font-semibold text-ink-soft">
+                    {pkg.title}
+                  </p>
+                </div>
+              ) : null}
+              <ul className="space-y-3">
                 {pkg.seminars.map((seminar) => (
                   <li
                     key={seminar.id}
-                    className="rounded-2xl border border-line-subtle bg-paper-page px-4 py-3.5"
+                    className="rounded-2xl border border-line bg-paper px-5 py-4 transition hover:border-ink/20"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-ink">
+                      <h3 className="font-display text-lg font-bold leading-snug">
                         {seminar.title}
                       </h3>
-                      <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold tabular-nums text-brand-700">
+                      <span className="shrink-0 rounded-full bg-ink px-3 py-1 text-xs font-bold tabular-nums text-white">
                         {seminar.slots} seat{seminar.slots === 1 ? "" : "s"}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-ink-muted">
+                    <p className="mt-2 text-xs font-medium text-ink-muted">
                       {formatSeminarWhen(seminar)}
                     </p>
                   </li>
@@ -79,25 +79,6 @@ export function SeminarSection({
             </div>
           ))}
         </div>
-      ) : (
-        <ul className="space-y-3">
-          {packagesWithSeminars[0]?.seminars.map((seminar) => (
-            <li
-              key={seminar.id}
-              className="rounded-2xl border border-line-subtle bg-paper-page px-4 py-3.5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-sm font-semibold text-ink">{seminar.title}</h3>
-                <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold tabular-nums text-brand-700">
-                  {seminar.slots} seat{seminar.slots === 1 ? "" : "s"}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-ink-muted">
-                {formatSeminarWhen(seminar)}
-              </p>
-            </li>
-          ))}
-        </ul>
       )}
     </section>
   );

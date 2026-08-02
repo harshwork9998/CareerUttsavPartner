@@ -4,6 +4,7 @@ import {
   getEvents,
   getPartnerById,
   getPartnerByLogin,
+  bumpPartnerAuthVersion,
   mergeAdminPartners,
   setSeminarSpeakers,
   updatePartner,
@@ -104,10 +105,12 @@ export async function PATCH(request: Request) {
       portalTempPassword: password,
       portalPasswordChangedAt: new Date().toISOString(),
     });
+    const bumped = bumpPartnerAuthVersion(partner.id);
     await syncPartnerPortalToAdmin(partner.id);
     return withSession(NextResponse.json({ ok: true }), {
       ...session,
       mustChangePassword: false,
+      authVersion: bumped?.portalAuthVersion ?? (session.authVersion ?? 0) + 1,
     });
   }
 

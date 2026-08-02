@@ -17,11 +17,9 @@ function encodeSession(session: PortalSession): string {
 
 function decodeSession(raw: string): PortalSession | null {
   try {
-    // Current format
     const json = Buffer.from(raw, "base64url").toString("utf8");
     return JSON.parse(json) as PortalSession;
   } catch {
-    // Legacy raw JSON cookie (may be truncated / unreliable)
     try {
       return JSON.parse(raw) as PortalSession;
     } catch {
@@ -36,6 +34,14 @@ export async function getSession(): Promise<PortalSession | null> {
   if (!raw) return null;
   const session = decodeSession(raw);
   if (!session?.partnerId || !session?.login) return null;
+
+  // Reject sessions issued before a password change/reset
+  const { getPartnerById } = await import("@/lib/partner-store");
+  const partner = getPartnerById(session.partnerId);
+  if (!partner) return null;
+  const currentVersion = partner.portalAuthVersion ?? 0;
+  if ((session.authVersion ?? 0) !== currentVersion) return null;
+
   return session;
 }
 

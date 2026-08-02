@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="520" viewBox="0 0 520 520">
+  <g fill="none" stroke="#14121A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.045">
+    <g transform="translate(70 80)">
+      <rect x="-18" y="-18" width="36" height="36" rx="7"/>
+      <text x="0" y="7" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#14121A" stroke="none">U</text>
+    </g>
+    <g transform="translate(180 70) rotate(-12)">
+      <circle cx="0" cy="-28" r="7"/>
+      <line x1="0" y1="-20" x2="0" y2="12"/>
+      <line x1="0" y1="-8" x2="-16" y2="4"/>
+      <line x1="0" y1="-8" x2="14" y2="-14"/>
+      <line x1="0" y1="12" x2="-12" y2="32"/>
+      <line x1="0" y1="12" x2="14" y2="30"/>
+    </g>
+    <g transform="translate(310 95)">
+      <line x1="-16" y1="-40" x2="-16" y2="40"/>
+      <line x1="16" y1="-40" x2="16" y2="40"/>
+      <line x1="-16" y1="-30" x2="16" y2="-30"/>
+      <line x1="-16" y1="-10" x2="16" y2="-10"/>
+      <line x1="-16" y1="10" x2="16" y2="10"/>
+      <line x1="-16" y1="30" x2="16" y2="30"/>
+    </g>
+    <g transform="translate(430 85)">
+      <path d="M-28 18 L-12 2 L2 12 L18 -12 L32 -24"/>
+      <circle cx="-28" cy="18" r="2.5" fill="#14121A" stroke="none"/>
+      <circle cx="-12" cy="2" r="2.5" fill="#14121A" stroke="none"/>
+      <circle cx="2" cy="12" r="2.5" fill="#14121A" stroke="none"/>
+      <circle cx="18" cy="-12" r="2.5" fill="#14121A" stroke="none"/>
+    </g>
+    <g transform="translate(100 230)">
+      <circle r="28"/>
+      <path d="M0 -14 L5 0 L0 14 L-5 0 Z"/>
+      <circle r="2.5" fill="#14121A" stroke="none"/>
+    </g>
+    <g transform="translate(250 240)">
+      <rect x="-34" y="-22" width="68" height="44" rx="6"/>
+      <path d="M-34 -18 L0 6 L34 -18"/>
+    </g>
+    <g transform="translate(400 250)">
+      <circle r="30"/>
+      <circle r="18"/>
+      <circle r="8"/>
+      <line x1="48" y1="-48" x2="10" y2="-10"/>
+    </g>
+    <g transform="translate(90 390)">
+      <rect x="-34" y="-22" width="68" height="44" rx="6"/>
+      <path d="M-34 -18 L0 6 L34 -18"/>
+    </g>
+    <g transform="translate(250 400)">
+      <circle cy="-4" r="20"/>
+      <path d="M-8 14 L-8 22 Q0 30 8 22 L8 14"/>
+      <line x1="-6" y1="28" x2="6" y2="28"/>
+    </g>
+    <g transform="translate(410 395)">
+      <rect x="-18" y="-18" width="36" height="36" rx="7"/>
+      <text x="0" y="7" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#14121A" stroke="none">C</text>
+    </g>
+    <g transform="translate(170 320)">
+      <circle r="3" fill="#14121A" stroke="none"/>
+    </g>
+    <g transform="translate(340 170)">
+      <line x1="-10" y1="0" x2="10" y2="0"/>
+      <line x1="0" y1="-10" x2="0" y2="10"/>
+    </g>
+  </g>
+</svg>

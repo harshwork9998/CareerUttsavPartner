@@ -60,6 +60,8 @@ export async function mergeAdminPartners() {
         portalPasswordChangedAt:
           adminPartner.portalPasswordChangedAt ??
           existing.portalPasswordChangedAt,
+        portalAuthVersion:
+          adminPartner.portalAuthVersion ?? existing.portalAuthVersion,
       };
     } else {
       store.push(adminPartner);
@@ -96,6 +98,13 @@ export function getPartnerByLogin(login: string) {
         p.portalInviteEmail?.toLowerCase() === normalized
     ) ?? null
   );
+}
+
+export function bumpPartnerAuthVersion(id: string) {
+  const partner = getPartnerById(id);
+  if (!partner) return null;
+  const next = (partner.portalAuthVersion ?? 0) + 1;
+  return updatePartner(id, { portalAuthVersion: next });
 }
 
 export function updatePartner(id: string, patch: Partial<Partner>) {

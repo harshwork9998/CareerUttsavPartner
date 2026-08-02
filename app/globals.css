@@ -3,12 +3,90 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --ink: #14121a;
+    --ink-soft: #3a3742;
+    --paper: #fbfaf3;
+    --paper-dim: #f2efe4;
+    --red: #e5372b;
+    --blue: #1e3fe0;
+    --yellow: #ffc530;
+    --green: #1f9e63;
+    --ease: cubic-bezier(0.16, 0.84, 0.44, 1);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
   body {
-    @apply antialiased text-ink;
-    background:
-      radial-gradient(1100px 520px at 8% -8%, rgba(31, 56, 100, 0.08), transparent 55%),
-      radial-gradient(900px 480px at 100% 0%, rgba(196, 163, 90, 0.08), transparent 50%),
-      linear-gradient(180deg, #f7f6f3 0%, #f3f6fa 48%, #f1f0ec 100%);
-    min-height: 100vh;
+    @apply min-h-screen font-sans antialiased text-ink;
+    background-color: var(--paper);
+    background-image: url("/cu-doodle.svg");
+    background-repeat: repeat;
+    background-size: 520px 520px;
+    line-height: 1.5;
+  }
+
+  ::selection {
+    background: rgba(229, 55, 43, 0.18);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--blue);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .cu-wrap {
+    @apply mx-auto w-full max-w-[1180px] px-5 sm:px-8;
+  }
+
+  .cu-eyebrow {
+    @apply inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.14em] text-cu-red;
+  }
+
+  .cu-eyebrow::before {
+    content: "";
+    @apply inline-block h-0.5 w-5 bg-cu-red;
+  }
+
+  .cu-btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-7 py-3.5 text-[15px] font-bold transition duration-300 ease-cu;
+  }
+
+  .cu-btn-primary {
+    @apply cu-btn bg-cu-red text-white shadow-red hover:-translate-y-0.5 hover:bg-cu-red-dark;
+  }
+
+  .cu-btn-ghost {
+    @apply cu-btn border-2 border-ink bg-transparent text-ink hover:-translate-y-0.5 hover:bg-ink hover:text-paper;
+  }
+
+  .cu-btn-light {
+    @apply cu-btn bg-white text-ink hover:-translate-y-0.5 hover:shadow-card;
+  }
+
+  .cu-input {
+    @apply h-12 w-full rounded-xl border border-line bg-paper px-4 text-sm text-ink outline-none transition placeholder:text-ink-muted focus:border-cu-blue focus:bg-white focus:ring-2 focus:ring-cu-blue/15;
+  }
+
+  .cu-panel {
+    @apply rounded-4xl border border-line bg-white/90 p-6 shadow-card backdrop-blur-sm sm:p-8;
   }
 }

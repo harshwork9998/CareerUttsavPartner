@@ -41,5 +41,6 @@ export async function POST(request: Request) {
     login:
       partner.portalLogin ?? partner.portalInviteEmail ?? login.toLowerCase(),
     mustChangePassword: !partner.portalPasswordChangedAt,
+    authVersion: partner.portalAuthVersion ?? 0,
   });
 }

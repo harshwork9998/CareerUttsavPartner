@@ -34,6 +34,10 @@ export function mapAdminPartnerToPortal(raw: AdminPartnerRecord): Partner | null
       typeof raw.portalPasswordChangedAt === "string"
         ? raw.portalPasswordChangedAt
         : undefined,
+    portalAuthVersion:
+      typeof raw.portalAuthVersion === "number"
+        ? raw.portalAuthVersion
+        : undefined,
     portalInviteEmail:
       typeof raw.portalInviteEmail === "string"
         ? raw.portalInviteEmail
@@ -95,6 +99,7 @@ export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
     portalSeminarSpeakers: partner.portalSeminarSpeakers,
     portalTempPassword: partner.portalTempPassword,
     portalPasswordChangedAt: partner.portalPasswordChangedAt,
+    portalAuthVersion: partner.portalAuthVersion,
   };
 }
 

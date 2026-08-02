@@ -80,6 +80,8 @@ export interface Partner {
   portalLogin?: string;
   portalTempPassword?: string;
   portalPasswordChangedAt?: string;
+  /** Incremented whenever the portal password changes — invalidates sessions. */
+  portalAuthVersion?: number;
   portalInviteEmail?: string;
   portalInviteSentAt?: string;
   portalDocuments?: PartnerPortalDocument[];
@@ -130,4 +132,6 @@ export type PortalSession = {
   partnerId: string;
   login: string;
   mustChangePassword: boolean;
+  /** Bumped on password change/reset — stale cookies are rejected. */
+  authVersion: number;
 };

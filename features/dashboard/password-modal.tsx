@@ -41,21 +41,26 @@ export function PasswordModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-5 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/45 p-5 backdrop-blur-sm">
       <form
         onSubmit={submit}
-        className="w-full max-w-md animate-fade-rise rounded-3xl border border-line-subtle bg-white p-7 shadow-soft"
+        className="w-full max-w-md animate-fade-rise overflow-hidden rounded-4xl bg-ink p-8 text-white shadow-soft"
       >
-        <h2 className="font-display text-2xl font-bold text-brand-800">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-cu-yellow">
+          First-time setup
+        </p>
+        <h2 className="mt-3 font-display text-3xl font-bold tracking-tight">
           Set a new password
         </h2>
-        <p className="mt-1 text-sm text-ink-secondary">
+        <p className="mt-2 text-sm font-medium text-white/60">
           Please change your temporary password after first login.
         </p>
         {error ? (
-          <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>
+          <p className="mt-4 rounded-xl bg-cu-red/20 px-3 py-2 text-sm font-semibold text-[#ffb4ae]">
+            {error}
+          </p>
         ) : null}
-        <div className="mt-5 space-y-3">
+        <div className="mt-6 space-y-3">
           <input
             type="password"
             value={password}
@@ -63,7 +68,7 @@ export function PasswordModal({
             placeholder="New password"
             minLength={8}
             required
-            className="h-11 w-full rounded-xl border border-line-strong px-3 outline-none focus:border-brand-500"
+            className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-cu-yellow"
           />
           <input
             type="password"
@@ -72,15 +77,15 @@ export function PasswordModal({
             placeholder="Confirm password"
             minLength={8}
             required
-            className="h-11 w-full rounded-xl border border-line-strong px-3 outline-none focus:border-brand-500"
+            className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-cu-yellow"
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="mt-4 h-11 w-full rounded-full bg-brand-700 font-semibold text-white disabled:opacity-60"
+          className="mt-5 h-12 w-full rounded-full bg-cu-red font-bold text-white shadow-red transition hover:bg-cu-red-dark disabled:opacity-60"
         >
-          Save password
+          {loading ? "Saving…" : "Save password"}
         </button>
       </form>
     </div>

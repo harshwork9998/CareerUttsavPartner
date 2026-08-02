@@ -12,87 +12,74 @@ export function PackageSection({
 }) {
   if (packages.length === 0) {
     return (
-      <Panel title="Partner package" subtitle="Your sponsorship deliverables by event.">
-        <p className="text-sm text-ink-muted">No event packages linked yet.</p>
-      </Panel>
+      <section className="cu-panel">
+        <p className="cu-eyebrow">Your package</p>
+        <h2 className="mt-4 font-display text-3xl font-bold tracking-tight">
+          Partner package
+        </h2>
+        <p className="mt-3 text-ink-soft">No event packages linked yet.</p>
+      </section>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {packages.map((pkg, index) => (
-        <motion.div
+        <motion.section
           key={pkg.eventId}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.05 }}
+          transition={{ delay: index * 0.06, ease: [0.16, 0.84, 0.44, 1] }}
+          className="cu-panel"
         >
-          <Panel
-            title={packages.length > 1 ? pkg.title : "Partner package"}
-            subtitle={
-              packages.length > 1
-                ? `${pkg.city} · ${pkg.tier || "Partnership"}`
-                : "Deliverables included in your sponsorship."
-            }
-            badge={packages.length > 1 ? pkg.tier : undefined}
-          >
-            <ul className="divide-y divide-line-subtle">
-              {pkg.deliverables.length === 0 ? (
-                <li className="py-2 text-sm text-ink-muted">No deliverables listed.</li>
-              ) : (
-                pkg.deliverables.map((item) => (
-                  <li
-                    key={item.id}
-                    className="grid grid-cols-[auto_1fr_auto] gap-3 py-3 first:pt-0"
-                  >
-                    <span className="mt-0.5 grid h-5 w-5 place-items-center rounded-full bg-success-soft text-success">
-                      <Check className="h-3 w-3" strokeWidth={3} />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{item.label}</p>
-                      {item.option ? (
-                        <p className="mt-0.5 text-xs text-ink-muted">{item.option}</p>
-                      ) : null}
-                    </div>
-                    <span className="self-start rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal-700">
-                      Included
-                    </span>
-                  </li>
-                ))
-              )}
-            </ul>
-          </Panel>
-        </motion.div>
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="cu-eyebrow">
+                {packages.length > 1 ? pkg.city : "Your package"}
+              </p>
+              <h2 className="mt-3 font-display text-[1.85rem] font-bold leading-tight tracking-tight">
+                {packages.length > 1 ? pkg.title : "What's included"}
+              </h2>
+              <p className="mt-2 text-sm font-medium text-ink-soft">
+                {packages.length > 1
+                  ? `${pkg.tier || "Partnership"} · deliverables locked in`
+                  : "Deliverables included in your sponsorship."}
+              </p>
+            </div>
+            {pkg.tier ? (
+              <span className="rounded-full bg-cu-yellow-soft px-3 py-1.5 text-[11px] font-extrabold text-ink">
+                {pkg.tier}
+              </span>
+            ) : null}
+          </div>
+
+          <ul className="divide-y divide-line">
+            {pkg.deliverables.length === 0 ? (
+              <li className="py-3 text-sm text-ink-muted">No deliverables listed.</li>
+            ) : (
+              pkg.deliverables.map((item) => (
+                <li
+                  key={item.id}
+                  className="grid grid-cols-[auto_1fr_auto] items-start gap-3 py-3.5 first:pt-0 last:pb-0"
+                >
+                  <span className="mt-0.5 grid h-6 w-6 place-items-center rounded-full bg-cu-green-soft text-cu-green">
+                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{item.label}</p>
+                    {item.option ? (
+                      <p className="mt-0.5 text-xs text-ink-muted">{item.option}</p>
+                    ) : null}
+                  </div>
+                  <span className="rounded-full bg-cu-blue-soft px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-cu-blue-dark">
+                    Included
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+        </motion.section>
       ))}
     </div>
-  );
-}
-
-function Panel({
-  title,
-  subtitle,
-  badge,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  badge?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-3xl border border-line-subtle bg-white p-5 shadow-card sm:p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-display text-xl font-bold text-brand-800">{title}</h2>
-          <p className="mt-1 text-sm text-ink-secondary">{subtitle}</p>
-        </div>
-        {badge ? (
-          <span className="shrink-0 rounded-full bg-brass-100 px-2.5 py-1 text-[10px] font-bold text-brass-700">
-            {badge}
-          </span>
-        ) : null}
-      </div>
-      {children}
-    </section>
   );
 }
