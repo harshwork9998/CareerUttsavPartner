@@ -18,6 +18,7 @@ import {
 } from "@/lib/partner-event-config";
 import { getSession, withSession, withoutSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
+import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
 import type { PartnerPortalDocument } from "@/lib/types";
 
 function invalidSessionResponse() {
@@ -161,12 +162,82 @@ export async function PATCH(request: Request) {
   }
 
   if (body.action === "seminar_speakers") {
+    const speakers = (Array.isArray(body.speakers) ? body.speakers : []).map(
+      (s: {
+        name?: string;
+        designation?: string;
+        contact?: string;
+        introduction?: string;
+        photoUrl?: string;
+      }) => ({
+        ...s,
+        name: String(s.name ?? "").trim(),
+        designation: String(s.designation ?? "").trim(),
+        contact: normalizeIndianMobile(String(s.contact ?? "")),
+        introduction: String(s.introduction ?? "").trim(),
+        photoUrl: String(s.photoUrl ?? "").trim(),
+      })
+    );
+
+    if (
+      speakers.length === 0 ||
+      speakers.some(
+        (s: { name: string; designation: string; contact: string; introduction: string; photoUrl: string }) =>
+          !s.name ||
+          !s.designation ||
+          !isValidIndianMobile(s.contact) ||
+          !s.introduction ||
+          !s.photoUrl
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Enter a valid 10-digit mobile number for each speaker" },
+        { status: 400 }
+      );
+    }
+
     setSeminarSpeakers(
       partner.id,
       body.eventId,
       body.seminarId,
-      body.speakers ?? []
+      speakers
     );
+    await syncPartnerPortalToAdmin(partner.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "representatives") {
+    const count = Math.max(0, Math.floor(Number(body.count) || 0));
+    const rows = Array.isArray(body.representatives)
+      ? body.representatives
+      : [];
+    const representatives = rows.slice(0, count).map(
+      (row: { name?: string; phone?: string }) => ({
+        name: String(row.name ?? "").trim(),
+        phone: normalizeIndianMobile(String(row.phone ?? "")),
+      })
+    );
+
+    if (
+      count < 1 ||
+      representatives.length !== count ||
+      representatives.some(
+        (r) => !r.name || !isValidIndianMobile(r.phone)
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Enter a valid 10-digit mobile number for each representative" },
+        { status: 400 }
+      );
+    }
+
+    updatePartner(partner.id, {
+      portalRepresentatives: {
+        count,
+        representatives,
+        updatedAt: new Date().toISOString(),
+      },
+    });
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }

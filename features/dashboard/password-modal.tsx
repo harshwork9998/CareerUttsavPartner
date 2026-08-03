@@ -134,7 +134,7 @@ export function PasswordModal({
               !allowLater && !onClose ? "w-full" : ""
             }`}
           >
-            {loading ? "Saving…" : "Save password"}
+            {loading ? "Saving…" : "Save"}
           </button>
         </div>
       </form>

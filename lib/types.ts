@@ -68,6 +68,18 @@ export interface PartnerSeminarSpeakerSubmission {
   updatedAt: string;
 }
 
+/** On-ground team attending Career Uttsav with the partner. */
+export interface PartnerRepresentative {
+  name: string;
+  phone: string;
+}
+
+export interface PartnerRepresentativesSubmission {
+  count: number;
+  representatives: PartnerRepresentative[];
+  updatedAt: string;
+}
+
 export interface Partner {
   id: string;
   name: string;
@@ -93,6 +105,8 @@ export interface Partner {
   portalWebsiteUrl?: string;
   portalSmsContent?: string;
   portalSeminarSpeakers?: PartnerSeminarSpeakerSubmission[];
+  /** How many representatives will attend, with name + phone for each. */
+  portalRepresentatives?: PartnerRepresentativesSubmission;
 }
 
 export interface EventSeminar {

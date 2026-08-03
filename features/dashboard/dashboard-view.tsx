@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { HeroSection } from "@/features/dashboard/hero-section";
 import { PackageSection } from "@/features/dashboard/package-section";
 import { SeminarSection } from "@/features/dashboard/seminar-section";
+import { RepresentativesSection } from "@/features/dashboard/representatives-section";
 import { SubmissionsSection } from "@/features/dashboard/submissions-section";
 import { PasswordModal } from "@/features/dashboard/password-modal";
 import { readFileAsDataUrl } from "@/lib/utils";
@@ -235,6 +236,17 @@ export function DashboardView() {
           <div className="min-w-0 space-y-6">
             <PackageSection packages={packages} />
             <SeminarSection packages={packages} />
+            <RepresentativesSection
+              partner={partner}
+              saving={patchMutation.isPending}
+              onSave={async (payload) => {
+                await patchMutation.mutateAsync({
+                  action: "representatives",
+                  count: payload.count,
+                  representatives: payload.representatives,
+                });
+              }}
+            />
           </div>
 
           <div className="min-w-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
@@ -276,11 +288,10 @@ export function DashboardView() {
 
         <footer className="mt-16 border-t border-line pt-8 text-center">
           <p className="font-display text-2xl font-bold tracking-tight">
-            Finish the checklist above.{" "}
-            <em className="not-italic text-cu-red">We&apos;ll handle production from there.</em>
+            Questions about your submissions?{" "}
+            <em className="not-italic text-cu-red">We&apos;re here to help.</em>
           </p>
           <p className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm font-medium text-ink-soft">
-            <span>Need help?</span>
             <a
               href="mailto:info@careeruttsav.in"
               className="inline-flex items-center gap-1.5 font-bold text-cu-red hover:underline"

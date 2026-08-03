@@ -83,7 +83,9 @@ export function getPartnerPortalUploadStatus(
             (s) =>
               Boolean(s.name.trim()) &&
               Boolean(s.designation?.trim()) &&
-              Boolean(s.contact?.trim() || s.phone?.trim() || s.email?.trim()) &&
+              /^[6-9]\d{9}$/.test(
+                String(s.contact ?? s.phone ?? "").replace(/\D/g, "").slice(-10)
+              ) &&
               Boolean(s.introduction?.trim()) &&
               Boolean(s.photoUrl?.trim())
           )

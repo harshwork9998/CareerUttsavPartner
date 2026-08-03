@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 
 import { PORTAL_SUBMISSION_ITEMS } from "@/lib/partner-portal-docs";
+import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
 import { readFileAsDataUrl } from "@/lib/utils";
 import type {
   EventPackageSummary,
   Partner,
   PartnerSeminarSpeakerDetail,
 } from "@/lib/types";
+import { PhoneField } from "@/features/dashboard/phone-field";
 
 function findSubmissionDoc(
   partner: Partner,
@@ -433,7 +435,9 @@ function SpeakerCard({
   ): PartnerSeminarSpeakerDetail => ({
     name: s.name ?? "",
     designation: s.designation ?? "",
-    contact: s.contact ?? s.phone ?? s.email ?? "",
+    contact: normalizeIndianMobile(
+      s.contact ?? s.phone ?? ""
+    ),
     introduction: s.introduction ?? "",
     photoUrl: s.photoUrl ?? "",
   });
@@ -452,6 +456,7 @@ function SpeakerCard({
       ? initialSpeakers.map(normalizeSpeaker)
       : emptySeats()
   );
+  const [attemptedSave, setAttemptedSave] = useState(false);
 
   useEffect(() => {
     setSpeakers(
@@ -459,6 +464,7 @@ function SpeakerCard({
         ? initialSpeakers.map(normalizeSpeaker)
         : emptySeats()
     );
+    setAttemptedSave(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSpeakers]);
 
@@ -466,7 +472,7 @@ function SpeakerCard({
     Boolean(
       s.name.trim() &&
         s.designation?.trim() &&
-        s.contact?.trim() &&
+        isValidIndianMobile(s.contact ?? "") &&
         s.introduction?.trim() &&
         s.photoUrl?.trim()
     );
@@ -546,11 +552,10 @@ function SpeakerCard({
               onChange={(e) => patchSpeaker(i, { designation: e.target.value })}
               className="cu-input !h-10"
             />
-            <input
-              placeholder="Contact (phone or email)"
+            <PhoneField
               value={speaker.contact ?? ""}
-              onChange={(e) => patchSpeaker(i, { contact: e.target.value })}
-              className="cu-input !h-10"
+              showError={attemptedSave}
+              onChange={(phone) => patchSpeaker(i, { contact: phone })}
             />
             <div>
               <textarea
@@ -573,13 +578,22 @@ function SpeakerCard({
       {dirty ? (
         <button
           type="button"
-          disabled={saving || !canSave}
-          onClick={() =>
-            void onSave(speakers.filter(speakerComplete))
-          }
+          disabled={saving}
+          onClick={() => {
+            setAttemptedSave(true);
+            if (!canSave) return;
+            void onSave(
+              speakers
+                .filter(speakerComplete)
+                .map((s) => ({
+                  ...s,
+                  contact: normalizeIndianMobile(s.contact ?? ""),
+                }))
+            );
+          }}
           className="mt-3 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white disabled:opacity-50"
         >
-          Save speakers
+          Save
         </button>
       ) : null}
     </div>
