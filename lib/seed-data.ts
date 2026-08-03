@@ -8,7 +8,7 @@ function svgLogo(label: string) {
 export const mockEvents: Event[] = [
   {
     id: "evt-001",
-    title: "Career Utsav Bengaluru 2026",
+    title: "Career Uttsav Bengaluru 2026",
     city: "Bangalore",
     startDate: "2026-08-15",
     endDate: "2026-08-16",
@@ -49,7 +49,7 @@ export const mockEvents: Event[] = [
   },
   {
     id: "evt-002",
-    title: "Career Utsav Mysore 2026",
+    title: "Career Uttsav Mysore 2026",
     city: "Mysore",
     startDate: "2026-07-05",
     endDate: "2026-07-05",
@@ -74,7 +74,7 @@ export const mockEvents: Event[] = [
   },
   {
     id: "evt-003",
-    title: "Career Utsav Hubli 2026",
+    title: "Career Uttsav Hubli 2026",
     city: "Hubli",
     startDate: "2026-12-10",
     endDate: "2026-12-11",
