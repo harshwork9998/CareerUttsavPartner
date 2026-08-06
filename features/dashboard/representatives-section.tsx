@@ -229,7 +229,7 @@ function EventRepresentativesForm({
             }}
             className="h-10 rounded-full bg-cu-red px-5 text-sm font-bold text-white disabled:opacity-50"
           >
-            Save{showCityHeader ? ` · ${city}` : ""}
+            Save
           </button>
         ) : null}
       </div>
