@@ -75,6 +75,8 @@ export interface PartnerRepresentative {
 }
 
 export interface PartnerRepresentativesSubmission {
+  /** Event (city edition) these on-ground reps are attending. */
+  eventId: string;
   count: number;
   representatives: PartnerRepresentative[];
   updatedAt: string;
@@ -105,8 +107,8 @@ export interface Partner {
   portalWebsiteUrl?: string;
   portalSmsContent?: string;
   portalSeminarSpeakers?: PartnerSeminarSpeakerSubmission[];
-  /** How many representatives will attend, with name + phone for each. */
-  portalRepresentatives?: PartnerRepresentativesSubmission;
+  /** On-ground reps per event/city, with name + phone for each. */
+  portalRepresentatives?: PartnerRepresentativesSubmission[];
 }
 
 export interface EventSeminar {

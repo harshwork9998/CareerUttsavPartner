@@ -238,10 +238,12 @@ export function DashboardView() {
             <SeminarSection packages={packages} />
             <RepresentativesSection
               partner={partner}
+              packages={packages}
               saving={patchMutation.isPending}
               onSave={async (payload) => {
                 await patchMutation.mutateAsync({
                   action: "representatives",
+                  eventId: payload.eventId,
                   count: payload.count,
                   representatives: payload.representatives,
                 });

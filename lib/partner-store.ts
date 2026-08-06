@@ -4,6 +4,8 @@ import { seedPartners, mockEvents } from "@/lib/seed-data";
 import type {
   Partner,
   PartnerPortalDocument,
+  PartnerRepresentative,
+  PartnerRepresentativesSubmission,
   PartnerSeminarSpeakerSubmission,
   Event,
 } from "@/lib/types";
@@ -45,11 +47,11 @@ export async function mergeAdminPartners() {
     );
     if (idx >= 0) {
       const existing = store[idx];
-      // Keep stable id + don't wipe portal credentials with undefined admin fields
+      // Admin id + credentials win so Chapter 8 passwords sync correctly.
       store[idx] = {
         ...existing,
         ...adminPartner,
-        id: existing.id,
+        id: adminPartner.id,
         portalLogin: adminPartner.portalLogin ?? existing.portalLogin,
         portalInviteEmail:
           adminPartner.portalInviteEmail ?? existing.portalInviteEmail,
@@ -65,6 +67,13 @@ export async function mergeAdminPartners() {
           existing.portalPasswordPromptSkippedAt,
         portalAuthVersion:
           adminPartner.portalAuthVersion ?? existing.portalAuthVersion,
+        // Preserve portal-uploaded content if Admin snapshot is older/empty
+        portalDocuments:
+          adminPartner.portalDocuments ?? existing.portalDocuments,
+        portalSeminarSpeakers:
+          adminPartner.portalSeminarSpeakers ?? existing.portalSeminarSpeakers,
+        portalRepresentatives:
+          adminPartner.portalRepresentatives ?? existing.portalRepresentatives,
       };
     } else {
       store.push(adminPartner);
@@ -143,6 +152,59 @@ export function updatePartner(id: string, patch: Partial<Partner>) {
   return updated;
 }
 
+/** Insert/update a minimal partner after Admin login succeeds. */
+export function upsertPartnerFromAdminAuth(input: {
+  id: string;
+  name: string;
+  portalLogin?: string;
+  portalInviteEmail?: string;
+  portalInviteSentAt?: string;
+  portalPasswordChangedAt?: string;
+  portalAuthVersion?: number;
+  portalTempPassword?: string;
+}): Partner {
+  const store = partners();
+  const idx = store.findIndex(
+    (p) =>
+      p.id === input.id ||
+      (input.portalLogin &&
+        p.portalLogin?.toLowerCase() === input.portalLogin.toLowerCase())
+  );
+  const base: Partner =
+    idx >= 0
+      ? store[idx]
+      : {
+          id: input.id,
+          name: input.name,
+          city: "",
+          state: "",
+          eventIds: [],
+          stage: "Confirmed",
+          portalDocuments: [],
+          portalSeminarSpeakers: [],
+        };
+
+  const updated: Partner = {
+    ...base,
+    id: input.id,
+    name: input.name || base.name,
+    portalLogin: input.portalLogin ?? base.portalLogin,
+    portalInviteEmail: input.portalInviteEmail ?? base.portalInviteEmail,
+    portalInviteSentAt:
+      input.portalInviteSentAt ??
+      base.portalInviteSentAt ??
+      new Date().toISOString(),
+    portalPasswordChangedAt:
+      input.portalPasswordChangedAt ?? base.portalPasswordChangedAt,
+    portalAuthVersion: input.portalAuthVersion ?? base.portalAuthVersion ?? 0,
+    portalTempPassword: input.portalTempPassword ?? base.portalTempPassword,
+  };
+
+  if (idx >= 0) store[idx] = updated;
+  else store.push(updated);
+  return updated;
+}
+
 export function upsertPortalDocument(
   partnerId: string,
   doc: Omit<PartnerPortalDocument, "id" | "uploadedAt"> & { id?: string }
@@ -197,6 +259,27 @@ export function setSeminarSpeakers(
   if (idx >= 0) rows[idx] = row;
   else rows.push(row);
   return updatePartner(partnerId, { portalSeminarSpeakers: rows });
+}
+
+export function setRepresentatives(
+  partnerId: string,
+  eventId: string,
+  count: number,
+  representatives: PartnerRepresentative[]
+) {
+  const partner = getPartnerById(partnerId);
+  if (!partner) return null;
+  const rows = [...(partner.portalRepresentatives ?? [])];
+  const idx = rows.findIndex((r) => r.eventId === eventId);
+  const row: PartnerRepresentativesSubmission = {
+    eventId,
+    count,
+    representatives,
+    updatedAt: new Date().toISOString(),
+  };
+  if (idx >= 0) rows[idx] = row;
+  else rows.push(row);
+  return updatePartner(partnerId, { portalRepresentatives: rows });
 }
 
 export function getEvents() {

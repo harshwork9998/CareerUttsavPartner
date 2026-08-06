@@ -6,6 +6,7 @@ import {
   getPartnerForSession,
   bumpPartnerAuthVersion,
   mergeAdminPartners,
+  setRepresentatives,
   setSeminarSpeakers,
   updatePartner,
   upsertPortalDocument,
@@ -207,16 +208,37 @@ export async function PATCH(request: Request) {
   }
 
   if (body.action === "representatives") {
+    const eventId = String(body.eventId ?? "").trim();
+    if (!eventId) {
+      return NextResponse.json(
+        { error: "eventId is required" },
+        { status: 400 }
+      );
+    }
+
+    const linkedEventIds = new Set(
+      [
+        ...(partner.eventIds ?? []),
+        ...(partner.eventPartnerships ?? []).map((p) => p.eventId),
+      ].filter(Boolean)
+    );
+    if (linkedEventIds.size > 0 && !linkedEventIds.has(eventId)) {
+      return NextResponse.json(
+        { error: "Event is not linked to this partner" },
+        { status: 400 }
+      );
+    }
+
     const count = Math.max(0, Math.floor(Number(body.count) || 0));
-    const rows = Array.isArray(body.representatives)
-      ? body.representatives
-      : [];
-    const representatives = rows.slice(0, count).map(
-      (row: { name?: string; phone?: string }) => ({
+    const rows = (
+      Array.isArray(body.representatives) ? body.representatives : []
+    ) as Array<{ name?: string; phone?: string }>;
+    const representatives: Array<{ name: string; phone: string }> = rows
+      .slice(0, count)
+      .map((row) => ({
         name: String(row.name ?? "").trim(),
         phone: normalizeIndianMobile(String(row.phone ?? "")),
-      })
-    );
+      }));
 
     if (
       count < 1 ||
@@ -231,13 +253,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    updatePartner(partner.id, {
-      portalRepresentatives: {
-        count,
-        representatives,
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    setRepresentatives(partner.id, eventId, count, representatives);
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }
