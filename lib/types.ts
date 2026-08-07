@@ -94,7 +94,12 @@ export interface Partner {
   deliverables?: PartnerDeliverable[];
   seminarSlotAssignments?: PartnerSeminarSlotAssignment[];
   portalLogin?: string;
+  /** Legacy plaintext — migrated to portalPasswordHash on load/save. */
   portalTempPassword?: string;
+  /** Salted scrypt hash of the portal password */
+  portalPasswordHash?: string;
+  /** From Admin API — password exists but secret is never returned */
+  hasPortalPassword?: boolean;
   portalPasswordChangedAt?: string;
   /** Set when the first-login password prompt is dismissed with "I'll do it later". */
   portalPasswordPromptSkippedAt?: string;

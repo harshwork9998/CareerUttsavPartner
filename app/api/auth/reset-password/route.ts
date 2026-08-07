@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { patchAdminPartner, pickPortalSyncPatch } from "@/lib/admin-api";
+import { patchAdminPartner } from "@/lib/admin-api";
+import { hashPartnerPassword } from "@/lib/partner-password";
 import {
   bumpPartnerAuthVersion,
   getPartnerById,
@@ -66,15 +67,17 @@ export async function POST(request: Request) {
 
   const changedAt = new Date().toISOString();
   updatePartner(partner.id, {
-    portalTempPassword: password,
+    portalPasswordHash: hashPartnerPassword(password),
+    portalTempPassword: undefined,
     portalPasswordChangedAt: changedAt,
   });
-  bumpPartnerAuthVersion(partner.id);
+  const bumped = bumpPartnerAuthVersion(partner.id);
 
-  const updated = getPartnerById(partner.id);
-  if (updated) {
-    await patchAdminPartner(updated.id, pickPortalSyncPatch(updated));
-  }
+  await patchAdminPartner(partner.id, {
+    portalTempPassword: password,
+    portalPasswordChangedAt: changedAt,
+    portalAuthVersion: bumped?.portalAuthVersion,
+  });
 
   // Clear any cookie on this browser and invalidate others via authVersion bump
   return withoutSession(

@@ -1,5 +1,9 @@
 import { generateId } from "@/lib/utils";
 import { fetchAdminEvents, fetchAdminPartners } from "@/lib/admin-api";
+import {
+  hashPartnerPassword,
+  isPartnerPasswordHash,
+} from "@/lib/partner-password";
 import { seedPartners, mockEvents } from "@/lib/seed-data";
 import type {
   Partner,
@@ -19,9 +23,27 @@ const globalStore = globalThis as unknown as {
   __cuEvents?: Event[];
 };
 
+function migratePartnerPassword(partner: Partner): Partner {
+  const plaintext = partner.portalTempPassword?.trim();
+  if (plaintext && !isPartnerPasswordHash(partner.portalPasswordHash)) {
+    return {
+      ...partner,
+      portalPasswordHash: hashPartnerPassword(plaintext),
+      portalTempPassword: undefined,
+    };
+  }
+  if (partner.portalTempPassword) {
+    const { portalTempPassword: _removed, ...rest } = partner;
+    return rest;
+  }
+  return partner;
+}
+
 function partners(): Partner[] {
   if (!globalStore.__cuPartners) {
-    globalStore.__cuPartners = structuredClone(seedPartners);
+    globalStore.__cuPartners = structuredClone(seedPartners).map(
+      migratePartnerPassword
+    );
   }
   return globalStore.__cuPartners;
 }
@@ -48,6 +70,10 @@ export async function mergeAdminPartners() {
     if (idx >= 0) {
       const existing = store[idx];
       // Admin id + credentials win so Chapter 8 passwords sync correctly.
+      // Prefer hash from Admin; keep local hash if Admin only reports hasPortalPassword.
+      const nextHash =
+        adminPartner.portalPasswordHash ??
+        existing.portalPasswordHash;
       store[idx] = {
         ...existing,
         ...adminPartner,
@@ -55,8 +81,8 @@ export async function mergeAdminPartners() {
         portalLogin: adminPartner.portalLogin ?? existing.portalLogin,
         portalInviteEmail:
           adminPartner.portalInviteEmail ?? existing.portalInviteEmail,
-        portalTempPassword:
-          adminPartner.portalTempPassword ?? existing.portalTempPassword,
+        portalPasswordHash: nextHash,
+        portalTempPassword: undefined,
         portalInviteSentAt:
           adminPartner.portalInviteSentAt ?? existing.portalInviteSentAt,
         portalPasswordChangedAt:
@@ -87,8 +113,21 @@ export async function mergeAdminPartners() {
 }
 
 export function reloadPartnerStoreFromSeed() {
-  globalStore.__cuPartners = structuredClone(seedPartners);
+  globalStore.__cuPartners = structuredClone(seedPartners).map(
+    migratePartnerPassword
+  );
   globalStore.__cuEvents = structuredClone(mockEvents);
+}
+
+/** Store a new portal password as a hash (never plaintext). */
+export function setPartnerPasswordHash(
+  partnerId: string,
+  password: string
+): Partner | null {
+  return updatePartner(partnerId, {
+    portalPasswordHash: hashPartnerPassword(password),
+    portalTempPassword: undefined,
+  });
 }
 
 export function getAllPartners() {
@@ -161,7 +200,9 @@ export function upsertPartnerFromAdminAuth(input: {
   portalInviteSentAt?: string;
   portalPasswordChangedAt?: string;
   portalAuthVersion?: number;
-  portalTempPassword?: string;
+  /** Plaintext from this login only — hashed before store. */
+  portalPassword?: string;
+  portalPasswordHash?: string;
 }): Partner {
   const store = partners();
   const idx = store.findIndex(
@@ -184,6 +225,10 @@ export function upsertPartnerFromAdminAuth(input: {
           portalSeminarSpeakers: [],
         };
 
+  const portalPasswordHash = input.portalPassword
+    ? hashPartnerPassword(input.portalPassword)
+    : input.portalPasswordHash ?? base.portalPasswordHash;
+
   const updated: Partner = {
     ...base,
     id: input.id,
@@ -197,7 +242,8 @@ export function upsertPartnerFromAdminAuth(input: {
     portalPasswordChangedAt:
       input.portalPasswordChangedAt ?? base.portalPasswordChangedAt,
     portalAuthVersion: input.portalAuthVersion ?? base.portalAuthVersion ?? 0,
-    portalTempPassword: input.portalTempPassword ?? base.portalTempPassword,
+    portalPasswordHash,
+    portalTempPassword: undefined,
   };
 
   if (idx >= 0) store[idx] = updated;

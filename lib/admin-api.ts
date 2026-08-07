@@ -113,6 +113,14 @@ export function mapAdminPartnerToPortal(raw: AdminPartnerRecord): Partner | null
       typeof raw.portalTempPassword === "string"
         ? raw.portalTempPassword
         : undefined,
+    portalPasswordHash:
+      typeof raw.portalPasswordHash === "string"
+        ? raw.portalPasswordHash
+        : undefined,
+    hasPortalPassword:
+      typeof raw.hasPortalPassword === "boolean"
+        ? raw.hasPortalPassword
+        : undefined,
     portalPasswordChangedAt:
       typeof raw.portalPasswordChangedAt === "string"
         ? raw.portalPasswordChangedAt
@@ -168,7 +176,10 @@ export async function fetchAdminPartners(): Promise<Partner[]> {
         // Activated once invite was sent OR credentials were issued in Admin.
         return Boolean(
           partner.portalInviteSentAt ||
-            (partner.portalLogin && partner.portalTempPassword)
+            (partner.portalLogin &&
+              (partner.hasPortalPassword ||
+                partner.portalPasswordHash ||
+                partner.portalTempPassword))
         );
       });
   } catch (error) {
@@ -281,7 +292,9 @@ export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
     portalSmsContent: partner.portalSmsContent,
     portalSeminarSpeakers: partner.portalSeminarSpeakers,
     portalRepresentatives: partner.portalRepresentatives,
-    portalTempPassword: partner.portalTempPassword,
+    // Prefer sending plaintext only from change_password path via direct patch.
+    // For general sync, send hash if present (Admin accepts portalPasswordHash).
+    portalPasswordHash: partner.portalPasswordHash,
     portalPasswordChangedAt: partner.portalPasswordChangedAt,
     portalPasswordPromptSkippedAt: partner.portalPasswordPromptSkippedAt,
     portalAuthVersion: partner.portalAuthVersion,

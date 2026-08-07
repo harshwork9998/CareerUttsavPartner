@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { patchAdminPartner, pickPortalSyncPatch } from "@/lib/admin-api";
+import { hashPartnerPassword } from "@/lib/partner-password";
 import {
   getEvents,
   getPartnerById,
@@ -55,7 +56,11 @@ export async function GET() {
       events
     );
 
-    const { portalTempPassword: _pw, ...safePartner } = partner;
+    const {
+    portalTempPassword: _pw,
+    portalPasswordHash: _hash,
+    ...safePartner
+  } = partner;
 
     return NextResponse.json({
       partner: safePartner,
@@ -112,12 +117,18 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
+    // Hash locally; sync plaintext once to Admin so Admin can re-hash & store.
     updatePartner(partner.id, {
-      portalTempPassword: password,
+      portalPasswordHash: hashPartnerPassword(password),
+      portalTempPassword: undefined,
       portalPasswordChangedAt: new Date().toISOString(),
     });
     const bumped = bumpPartnerAuthVersion(partner.id);
-    await syncPartnerPortalToAdmin(partner.id);
+    await patchAdminPartner(partner.id, {
+      portalTempPassword: password,
+      portalPasswordChangedAt: new Date().toISOString(),
+      portalAuthVersion: bumped?.portalAuthVersion,
+    });
     return withSession(NextResponse.json({ ok: true }), {
       ...session,
       mustChangePassword: false,

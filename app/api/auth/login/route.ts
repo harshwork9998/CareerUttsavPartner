@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 
 import { loginAgainstAdmin } from "@/lib/admin-api";
 import {
+  partnerHasStoredPassword,
+  verifyPartnerStoredPassword,
+} from "@/lib/partner-password";
+import {
   getPartnerById,
   getPartnerByLogin,
   mergeAdminPartners,
-  updatePartner,
   upsertPartnerFromAdminAuth,
 } from "@/lib/partner-store";
 import { withSession } from "@/lib/session";
@@ -27,30 +30,25 @@ export async function POST(request: Request) {
   if (adminAuth.ok) {
     await mergeAdminPartners();
 
-    let partner =
+    const existing =
       getPartnerById(adminAuth.partner.id) ?? getPartnerByLogin(login);
 
-    if (!partner) {
-      partner = upsertPartnerFromAdminAuth({
-        ...adminAuth.partner,
-        portalTempPassword: password,
-      });
-    } else if (partner.portalTempPassword !== password) {
-      partner =
-        updatePartner(partner.id, {
-          portalTempPassword: password,
-          portalLogin:
-            adminAuth.partner.portalLogin ?? partner.portalLogin ?? login,
-          portalInviteEmail:
-            adminAuth.partner.portalInviteEmail ?? partner.portalInviteEmail,
-          portalInviteSentAt:
-            adminAuth.partner.portalInviteSentAt ??
-            partner.portalInviteSentAt ??
-            new Date().toISOString(),
-          portalPasswordChangedAt: adminAuth.partner.portalPasswordChangedAt,
-          portalAuthVersion: adminAuth.partner.portalAuthVersion ?? 0,
-        }) ?? partner;
-    }
+    // Cache a local hash of the verified password for offline fallback — never plaintext.
+    const partner = upsertPartnerFromAdminAuth({
+      id: adminAuth.partner.id,
+      name: adminAuth.partner.name || existing?.name || "Partner",
+      portalLogin:
+        adminAuth.partner.portalLogin ?? existing?.portalLogin ?? login,
+      portalInviteEmail:
+        adminAuth.partner.portalInviteEmail ?? existing?.portalInviteEmail,
+      portalInviteSentAt:
+        adminAuth.partner.portalInviteSentAt ??
+        existing?.portalInviteSentAt ??
+        new Date().toISOString(),
+      portalPasswordChangedAt: adminAuth.partner.portalPasswordChangedAt,
+      portalAuthVersion: adminAuth.partner.portalAuthVersion ?? 0,
+      portalPassword: password,
+    });
 
     const response = NextResponse.json({
       ok: true,
@@ -72,10 +70,10 @@ export async function POST(request: Request) {
     // Fall back to local/seed only when Admin is unreachable (offline demo).
     await mergeAdminPartners();
     const partner = getPartnerByLogin(login);
-    if (!partner?.portalTempPassword) {
+    if (!partner || !partnerHasStoredPassword(partner)) {
       return NextResponse.json({ error: adminAuth.error }, { status: 503 });
     }
-    if (partner.portalTempPassword !== password) {
+    if (!verifyPartnerStoredPassword(partner, password)) {
       return NextResponse.json(
         { error: "Invalid login or password" },
         { status: 401 }
