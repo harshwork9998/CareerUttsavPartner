@@ -6,6 +6,7 @@ import type {
   Event,
 } from "@/lib/types";
 
+/** Career Uttsav Admin — not this portal (portal is :3001). */
 const ADMIN_API_URL =
   process.env.ADMIN_API_URL ??
   process.env.NEXT_PUBLIC_ADMIN_API_URL ??
