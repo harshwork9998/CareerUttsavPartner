@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { PortalSession } from "@/lib/types";
@@ -6,25 +7,72 @@ const COOKIE = "cu_partner_session";
 
 const cookieOptions = {
   httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
   path: "/",
   maxAge: 60 * 60 * 24 * 7,
 };
 
-function encodeSession(session: PortalSession): string {
-  return Buffer.from(JSON.stringify(session), "utf8").toString("base64url");
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (!secret) {
+    throw new Error(
+      "SESSION_SECRET is not configured. Set SESSION_SECRET to a long random string (server-side only) before signing or verifying partner sessions."
+    );
+  }
+  return secret;
 }
 
+function signPayload(payloadB64: string): string {
+  return createHmac("sha256", getSessionSecret())
+    .update(payloadB64)
+    .digest("base64url");
+}
+
+function signaturesMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/** Cookie value: base64url(payload).base64url(hmac-sha256) */
+function encodeSession(session: PortalSession): string {
+  const payload = Buffer.from(JSON.stringify(session), "utf8").toString(
+    "base64url"
+  );
+  return `${payload}.${signPayload(payload)}`;
+}
+
+/**
+ * Verify HMAC before decoding. Rejects unsigned, malformed, or tampered cookies.
+ * Does not accept the legacy unsigned base64 format.
+ */
 function decodeSession(raw: string): PortalSession | null {
   try {
-    const json = Buffer.from(raw, "base64url").toString("utf8");
-    return JSON.parse(json) as PortalSession;
-  } catch {
-    try {
-      return JSON.parse(raw) as PortalSession;
-    } catch {
-      return null;
+    const separator = raw.indexOf(".");
+    if (separator <= 0 || separator !== raw.lastIndexOf(".")) return null;
+
+    const payload = raw.slice(0, separator);
+    const signature = raw.slice(separator + 1);
+    if (!payload || !signature) return null;
+
+    const expected = signPayload(payload);
+    if (!signaturesMatch(signature, expected)) return null;
+
+    const json = Buffer.from(payload, "base64url").toString("utf8");
+    const session = JSON.parse(json) as PortalSession;
+    if (!session || typeof session !== "object") return null;
+    return session;
+  } catch (err) {
+    // Configuration errors must surface; parse/verify failures stay unauthenticated.
+    if (
+      err instanceof Error &&
+      err.message.startsWith("SESSION_SECRET is not configured")
+    ) {
+      throw err;
     }
+    return null;
   }
 }
 
@@ -32,6 +80,7 @@ export async function getSession(): Promise<PortalSession | null> {
   const jar = await cookies();
   const raw = jar.get(COOKIE)?.value;
   if (!raw) return null;
+
   const session = decodeSession(raw);
   if (!session?.partnerId || !session?.login) return null;
 
