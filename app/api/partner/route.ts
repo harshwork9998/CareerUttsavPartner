@@ -31,14 +31,15 @@ function invalidSessionResponse() {
 }
 
 export async function GET() {
+  // Merge Admin partners before session validation so a valid cookie is not
+  // rejected solely because this worker's in-memory store was still cold.
+  await mergeAdminPartners();
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    await mergeAdminPartners();
-
     const partner = getPartnerForSession(session);
     if (!partner) {
       return invalidSessionResponse();
@@ -88,6 +89,8 @@ async function syncPartnerPortalToAdmin(partnerId: string) {
 }
 
 export async function PATCH(request: Request) {
+  // Same ordering as GET — required for skip_password_prompt ("I'll do it later").
+  await mergeAdminPartners();
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

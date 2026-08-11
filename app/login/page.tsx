@@ -9,9 +9,9 @@ export default async function LoginPage({
   searchParams: Promise<{ reset?: string }>;
 }) {
   const params = await searchParams;
+  await mergeAdminPartners();
   const session = await getSession();
   if (session) {
-    await mergeAdminPartners();
     const partner = getPartnerForSession(session);
     if (partner) redirect("/dashboard");
     redirect("/api/auth/logout");
