@@ -284,7 +284,11 @@ export async function fetchAdminEvents(): Promise<Event[]> {
   }
 }
 
-/** Fields written by the partner portal — synced back to Admin after each save. */
+/** Fields written by the partner portal — synced back to Admin after each save.
+ * Never include credentials (hash/temp password) or portalAuthVersion — Admin
+ * treats a different hash as a credential change and bumps authVersion, which
+ * invalidates the current session cookie.
+ */
 export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
   return {
     portalDocuments: partner.portalDocuments,
@@ -293,12 +297,8 @@ export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
     portalSmsContent: partner.portalSmsContent,
     portalSeminarSpeakers: partner.portalSeminarSpeakers,
     portalRepresentatives: partner.portalRepresentatives,
-    // Prefer sending plaintext only from change_password path via direct patch.
-    // For general sync, send hash if present (Admin accepts portalPasswordHash).
-    portalPasswordHash: partner.portalPasswordHash,
     portalPasswordChangedAt: partner.portalPasswordChangedAt,
     portalPasswordPromptSkippedAt: partner.portalPasswordPromptSkippedAt,
-    portalAuthVersion: partner.portalAuthVersion,
   };
 }
 
