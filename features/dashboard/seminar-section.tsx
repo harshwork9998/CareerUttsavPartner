@@ -12,6 +12,7 @@ export function SeminarSection({
 }) {
   const packagesWithSeminars = packages.filter((p) => p.seminars.length > 0);
   const totalSeats = packages.reduce((s, p) => s + p.seatsAssigned, 0);
+  const multiEvent = packages.length > 1;
 
   return (
     <section className="cu-panel">
@@ -23,7 +24,9 @@ export function SeminarSection({
             Seminar seats
           </h2>
           <p className="mt-2 text-sm font-medium text-ink-soft">
-            Panelist seats allotted across your events.
+            {multiEvent
+              ? "Panelist seats allotted across your events."
+              : "Panelist seats allotted for this event."}
           </p>
         </div>
         {totalSeats > 0 ? (

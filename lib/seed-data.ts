@@ -47,56 +47,6 @@ export const mockEvents: Event[] = [
       },
     ],
   },
-  {
-    id: "evt-002",
-    title: "Career Uttsav Mysore 2026",
-    city: "Mysore",
-    startDate: "2026-07-05",
-    endDate: "2026-07-05",
-    seminars: [
-      {
-        id: "sem-002-a",
-        title: "Cracking the codes to ace competitive exams",
-        date: "2026-07-05",
-        startTime: "11:00",
-        endTime: "12:00",
-        hall: 1,
-      },
-      {
-        id: "sem-002-b",
-        title: "Careers in Management & Entrepreneurship",
-        date: "2026-07-05",
-        startTime: "14:00",
-        endTime: "15:00",
-        hall: 2,
-      },
-    ],
-  },
-  {
-    id: "evt-003",
-    title: "Career Uttsav Hubli 2026",
-    city: "Hubli",
-    startDate: "2026-12-10",
-    endDate: "2026-12-11",
-    seminars: [
-      {
-        id: "sem-003-a",
-        title: "New-age Engineering Careers",
-        date: "2026-12-10",
-        startTime: "10:00",
-        endTime: "11:00",
-        hall: 1,
-      },
-      {
-        id: "sem-003-b",
-        title: "Is CA / CS My Cup of Tea?",
-        date: "2026-12-11",
-        startTime: "11:00",
-        endTime: "12:00",
-        hall: 2,
-      },
-    ],
-  },
 ];
 
 const bangaloreDeliverables = [
@@ -110,22 +60,7 @@ const bangaloreDeliverables = [
   { id: "blr-d8", key: "students", label: "Access to pre-registered students", included: true, option: "selected seminar session" },
 ];
 
-const mysoreDeliverables = [
-  { id: "mys-d1", key: "stall", label: "Stall Size (Square Meter)", included: true, option: "9 (3x3)" },
-  { id: "mys-d2", key: "weblink", label: "Weblink in the Career Uttsav website", included: true },
-  { id: "mys-d3", key: "branding", label: "Common branding at event venue", included: true, option: "Mysore edition" },
-  { id: "mys-d4", key: "souvenir", label: "Full page write-up in the event souvenir", included: true },
-  { id: "mys-d5", key: "students", label: "Access to pre-registered students", included: true, option: "all sessions" },
-];
-
-const hubliDeliverables = [
-  { id: "hub-d1", key: "stall", label: "Stall Size (Square Meter)", included: true, option: "6 (2x3)" },
-  { id: "hub-d2", key: "weblink", label: "Weblink in the Career Uttsav website", included: true },
-  { id: "hub-d3", key: "branding", label: "Common branding at event venue", included: true, option: "Hubli edition" },
-  { id: "hub-d4", key: "logo_creative", label: "Logo on B2C creatives", included: true },
-];
-
-/** 3-event demo — use this login to preview multi-event layout */
+/** Christ University demo login (Bangalore / evt-001). */
 export const MULTI_EVENT_DEMO = {
   login: "anitha.rao@christuniversity.in",
   password: "ChristDemo9x",
@@ -138,7 +73,7 @@ export const seedPartners: Partner[] = [
     name: "Christ University",
     city: "Bangalore",
     state: "Karnataka",
-    eventIds: ["evt-001", "evt-002", "evt-003"],
+    eventIds: ["evt-001"],
     stage: "Confirmed",
     sponsorshipTier: "Knowledge Partner (Gold)",
     eventPartnerships: [
@@ -148,25 +83,10 @@ export const seedPartners: Partner[] = [
         deliverables: bangaloreDeliverables,
         seminarSlotCount: 3,
       },
-      {
-        eventId: "evt-002",
-        sponsorshipTier: "University Partner",
-        deliverables: mysoreDeliverables,
-        seminarSlotCount: 2,
-      },
-      {
-        eventId: "evt-003",
-        sponsorshipTier: "Stall Partner",
-        deliverables: hubliDeliverables,
-        seminarSlotCount: 1,
-      },
     ],
     seminarSlotAssignments: [
       { eventId: "evt-001", seminarId: "sem-001-a", slots: 1 },
       { eventId: "evt-001", seminarId: "sem-001-b", slots: 2 },
-      { eventId: "evt-002", seminarId: "sem-002-a", slots: 1 },
-      { eventId: "evt-002", seminarId: "sem-002-b", slots: 1 },
-      { eventId: "evt-003", seminarId: "sem-003-a", slots: 1 },
     ],
     portalLogin: MULTI_EVENT_DEMO.login,
     portalTempPassword: MULTI_EVENT_DEMO.password,
