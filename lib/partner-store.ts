@@ -69,11 +69,7 @@ export async function mergeAdminPartners() {
     );
     if (idx >= 0) {
       const existing = store[idx];
-      // Admin id + credentials win so Chapter 8 passwords sync correctly.
-      // Prefer hash from Admin; keep local hash if Admin only reports hasPortalPassword.
-      const nextHash =
-        adminPartner.portalPasswordHash ??
-        existing.portalPasswordHash;
+      // Password hash stays local — set on login/password change, never from Admin sync.
       store[idx] = {
         ...existing,
         ...adminPartner,
@@ -81,7 +77,7 @@ export async function mergeAdminPartners() {
         portalLogin: adminPartner.portalLogin ?? existing.portalLogin,
         portalInviteEmail:
           adminPartner.portalInviteEmail ?? existing.portalInviteEmail,
-        portalPasswordHash: nextHash,
+        portalPasswordHash: existing.portalPasswordHash,
         portalTempPassword: undefined,
         portalInviteSentAt:
           adminPartner.portalInviteSentAt ?? existing.portalInviteSentAt,

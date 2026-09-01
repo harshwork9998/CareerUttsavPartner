@@ -12,6 +12,17 @@ const ADMIN_API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_URL ??
   "http://localhost:3002";
 
+const PARTNER_PORTAL_SERVICE_SECRET =
+  process.env.PARTNER_PORTAL_SERVICE_SECRET?.trim() ?? "";
+
+function partnerServiceHeaders(): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (PARTNER_PORTAL_SERVICE_SECRET) {
+    headers["x-cu-partner-service-key"] = PARTNER_PORTAL_SERVICE_SECRET;
+  }
+  return headers;
+}
+
 type AdminPartnerRecord = Record<string, unknown>;
 
 function normalizeRepresentativeRows(
@@ -114,10 +125,6 @@ export function mapAdminPartnerToPortal(raw: AdminPartnerRecord): Partner | null
       typeof raw.portalTempPassword === "string"
         ? raw.portalTempPassword
         : undefined,
-    portalPasswordHash:
-      typeof raw.portalPasswordHash === "string"
-        ? raw.portalPasswordHash
-        : undefined,
     hasPortalPassword:
       typeof raw.hasPortalPassword === "boolean"
         ? raw.hasPortalPassword
@@ -160,12 +167,13 @@ export function mapAdminPartnerToPortal(raw: AdminPartnerRecord): Partner | null
 
 export async function fetchAdminPartners(): Promise<Partner[]> {
   try {
-    const res = await fetch(`${ADMIN_API_URL}/api/partners`, {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/partners`, {
       cache: "no-store",
+      headers: partnerServiceHeaders(),
     });
     if (!res.ok) {
       console.error(
-        `[admin-api] GET /api/partners failed (${res.status}) from ${ADMIN_API_URL}`
+        `[admin-api] GET /api/partner-portal/partners failed (${res.status}) from ${ADMIN_API_URL}`
       );
       return [];
     }
@@ -178,14 +186,12 @@ export async function fetchAdminPartners(): Promise<Partner[]> {
         return Boolean(
           partner.portalInviteSentAt ||
             (partner.portalLogin &&
-              (partner.hasPortalPassword ||
-                partner.portalPasswordHash ||
-                partner.portalTempPassword))
+              (partner.hasPortalPassword || partner.portalTempPassword))
         );
       });
   } catch (error) {
     console.error(
-      `[admin-api] Could not reach Admin at ${ADMIN_API_URL}/api/partners`,
+      `[admin-api] Could not reach Admin at ${ADMIN_API_URL}/api/partner-portal/partners`,
       error
     );
     return [];
@@ -275,6 +281,7 @@ export async function fetchAdminEvents(): Promise<Event[]> {
   try {
     const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/events`, {
       cache: "no-store",
+      headers: partnerServiceHeaders(),
     });
     if (!res.ok) return [];
     const raw = (await res.json()) as Event[];
@@ -307,9 +314,12 @@ export async function patchAdminPartner(
   patch: Partial<Partner>
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${ADMIN_API_URL}/api/partners/${id}`, {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/partners/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...partnerServiceHeaders(),
+      },
       body: JSON.stringify(patch),
       cache: "no-store",
     });
