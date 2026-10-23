@@ -23,8 +23,8 @@ import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
 import { validateLinkedInProfile } from "@/lib/linkedin-profile";
 import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
 import {
+  collectRepresentativeSubmission,
   mergeRepresentativesPreservingHistory,
-  partnerRepresentativeCountError,
   representativeAllocationForEvent,
 } from "@/lib/representative-allocation";
 import { validateSmsContent } from "@/lib/sms-content";
@@ -319,33 +319,20 @@ export async function PATCH(request: Request) {
       partner.eventPartnerships,
       eventId
     );
-    const countError = partnerRepresentativeCountError(allocation, body.count);
-    if (countError) {
-      return NextResponse.json({ error: countError }, { status: 400 });
-    }
-
     const rows = (
       Array.isArray(body.representatives) ? body.representatives : []
     ) as Array<{ name?: string; designation?: string; phone?: string }>;
-    const submitted = rows.slice(0, allocation).map((row) => ({
-      name: String(row.name ?? "").trim(),
-      designation: String(row.designation ?? "").trim(),
-      phone: normalizeIndianMobile(String(row.phone ?? "")),
-    }));
-
-    if (
-      submitted.length !== allocation ||
-      submitted.some(
-        (r) => !r.name || !r.designation || !isValidIndianMobile(r.phone)
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Enter a name, designation, and valid 10-digit mobile number for each representative",
-        },
-        { status: 400 }
-      );
+    const prepared = collectRepresentativeSubmission(
+      rows.map((row) => ({
+        name: String(row.name ?? "").trim(),
+        designation: String(row.designation ?? "").trim(),
+        phone: normalizeIndianMobile(String(row.phone ?? "")),
+      })),
+      allocation,
+      isValidIndianMobile
+    );
+    if (!prepared.ok) {
+      return NextResponse.json({ error: prepared.error }, { status: 400 });
     }
 
     const existing = (partner.portalRepresentatives ?? []).find(
@@ -358,10 +345,15 @@ export async function PATCH(request: Request) {
         phone: row.phone,
       })),
       allocation,
-      submitted
+      prepared.representatives
     );
 
-    setRepresentatives(partner.id, eventId, allocation, representatives);
+    setRepresentatives(
+      partner.id,
+      eventId,
+      prepared.representatives.length,
+      representatives
+    );
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }

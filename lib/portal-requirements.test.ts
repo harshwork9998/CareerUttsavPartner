@@ -8,8 +8,12 @@ import {
   partnerFacingCopy,
 } from "@/lib/deliverable-labels";
 import { validateLinkedInProfile } from "@/lib/linkedin-profile";
+import { isValidIndianMobile } from "@/lib/phone";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
 import {
+  canAddRepresentative,
+  collectRepresentativeSubmission,
+  initialRepresentativeRows,
   mergeRepresentativesPreservingHistory,
   partnerRepresentativeCountError,
   representativeAllocationForEvent,
@@ -43,9 +47,12 @@ describe("representative allocation", () => {
     expect(representativeAllocationForEvent(partnerships, "evt-001")).toBe(3);
     expect(representativeAllocationForEvent(partnerships, "missing")).toBe(0);
     expect(representativeAllocationForEvent(undefined, "evt-001")).toBe(0);
+    expect(partnerRepresentativeCountError(3, 0)).toBeNull();
+    expect(partnerRepresentativeCountError(3, 1)).toBeNull();
+    expect(partnerRepresentativeCountError(3, 2)).toBeNull();
     expect(partnerRepresentativeCountError(3, 3)).toBeNull();
-    expect(partnerRepresentativeCountError(3, 4)).toMatch(/cannot be changed/);
-    expect(partnerRepresentativeCountError(0, 0)).toMatch(/No event representative/);
+    expect(partnerRepresentativeCountError(3, 4)).toMatch(/allocated maximum/);
+    expect(partnerRepresentativeCountError(0, 0)).toBeNull();
     expect(representativeFormCount(3)).toBe(3);
     expect(representativeFormCount(0)).toBe(0);
     expect(representativeFormCount(null)).toBe(0);
@@ -66,6 +73,70 @@ describe("representative allocation", () => {
       designation: "Lead",
       phone: "9876543211",
     });
+  });
+});
+
+describe("representative submission maximum", () => {
+  const valid = (name: string) => ({
+    name,
+    designation: "Director",
+    phone: "9876543210",
+  });
+
+  function collect(rows: Array<{ name?: string; designation?: string; phone?: string }>, allocation = 3) {
+    return collectRepresentativeSubmission(rows, allocation, isValidIndianMobile);
+  }
+
+  it("allows 0 through the allocation and rejects one more", () => {
+    expect(collect([]).ok).toBe(true);
+    expect(collect([valid("A")]).ok).toBe(true);
+    expect(collect([valid("A"), valid("B")]).ok).toBe(true);
+    expect(collect([valid("A"), valid("B"), valid("C")]).ok).toBe(true);
+    expect(collect([valid("A"), valid("B"), valid("C"), valid("D")]).ok).toBe(false);
+  });
+
+  it("ignores a blank row and rejects a partial row", () => {
+    const withBlank = collect([
+      valid("Asha"),
+      { name: "", designation: "", phone: "" },
+    ]);
+    expect(withBlank.ok).toBe(true);
+    if (withBlank.ok) expect(withBlank.representatives).toHaveLength(1);
+
+    expect(collect([{ name: "John", designation: "", phone: "" }]).ok).toBe(false);
+    expect(
+      collect([{ name: "John", designation: "", phone: "9876543210" }]).ok
+    ).toBe(false);
+    expect(collect([valid("John")]).ok).toBe(true);
+  });
+
+  it("shows saved rows, one blank starter, and stops at the maximum", () => {
+    expect(initialRepresentativeRows(30, undefined)).toHaveLength(1);
+    expect(initialRepresentativeRows(30, [])).toEqual([
+      { name: "", designation: "", phone: "" },
+    ]);
+    expect(
+      initialRepresentativeRows(30, [
+        valid("A"),
+        valid("B"),
+      ])
+    ).toHaveLength(2);
+    expect(canAddRepresentative(2, 30)).toBe(true);
+    expect(canAddRepresentative(3, 3)).toBe(false);
+    expect(canAddRepresentative(30, 30)).toBe(false);
+
+    const source = readFileSync(
+      path.join(root, "features/dashboard/representatives-section.tsx"),
+      "utf8"
+    );
+    expect(source).toContain("+ Add representative");
+    expect(source).toContain("Remove representative");
+    expect(source).not.toContain("Number of representatives");
+    expect(source).not.toContain('type="number"');
+    expect(source).not.toContain("Array.from({ length: allocation }");
+    expect(source).toContain(
+      "Tell us how many people from your team will attend Career Uttsav."
+    );
   });
 });
 
