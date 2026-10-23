@@ -19,8 +19,7 @@ type DashboardPayload = {
   partner: Partner;
   packages: EventPackageSummary[];
   mustChangePassword: boolean;
-  forcePasswordPrompt: boolean;
-  uploadStatus: ReturnType<
+  uploadStatus?: ReturnType<
     typeof import("@/lib/partner-portal-docs").getPartnerPortalUploadStatus
   >;
 };
@@ -44,7 +43,6 @@ export function DashboardView() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const [passwordAllowLater, setPasswordAllowLater] = useState(false);
 
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["partner-dashboard"],
@@ -54,15 +52,7 @@ export function DashboardView() {
     refetchOnMount: "always",
   });
 
-  useEffect(() => {
-    if (data?.forcePasswordPrompt) {
-      setPasswordOpen(true);
-      setPasswordAllowLater(true);
-    }
-  }, [data?.forcePasswordPrompt]);
-
   const openChangePassword = () => {
-    setPasswordAllowLater(false);
     setPasswordOpen(true);
   };
 
@@ -148,7 +138,32 @@ export function DashboardView() {
     );
   }
 
+  if (data.mustChangePassword) {
+    return (
+      <div className="min-h-screen bg-paper">
+        <PasswordModal
+          open
+          allowLater={false}
+          onSave={async (password) => {
+            await patchMutation.mutateAsync({
+              action: "change_password",
+              password,
+            });
+            setPasswordOpen(false);
+            refresh();
+          }}
+        />
+        <div className="flex min-h-screen items-end justify-center pb-10">
+          <button type="button" onClick={logout} className="cu-btn-ghost">
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const { partner, packages, uploadStatus } = data;
+  if (!uploadStatus) return null;
   const logoDoc = partner.portalDocuments?.find((d) => d.kind === "logo");
 
   return (
@@ -319,21 +334,9 @@ export function DashboardView() {
 
       <PasswordModal
         open={passwordOpen}
-        allowLater={passwordAllowLater}
-        onClose={
-          passwordAllowLater
-            ? undefined
-            : () => {
-                setPasswordOpen(false);
-              }
-        }
-        onLater={async () => {
-          await patchMutation.mutateAsync({
-            action: "skip_password_prompt",
-          });
+        allowLater={false}
+        onClose={() => {
           setPasswordOpen(false);
-          setPasswordAllowLater(false);
-          refresh();
         }}
         onSave={async (password) => {
           await patchMutation.mutateAsync({
@@ -341,7 +344,6 @@ export function DashboardView() {
             password,
           });
           setPasswordOpen(false);
-          setPasswordAllowLater(false);
           refresh();
         }}
       />

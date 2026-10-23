@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { getPartnerForSession, mergeAdminPartners } from "@/lib/partner-store";
 import { getSession } from "@/lib/session";
 import { LoginView } from "@/features/login/login-view";
 
@@ -9,12 +8,7 @@ export default async function LoginPage({
   searchParams: Promise<{ reset?: string }>;
 }) {
   const params = await searchParams;
-  await mergeAdminPartners();
   const session = await getSession();
-  if (session) {
-    const partner = getPartnerForSession(session);
-    if (partner) redirect("/dashboard");
-    redirect("/api/auth/logout");
-  }
+  if (session) redirect("/dashboard");
   return <LoginView resetSuccess={params.reset === "success"} />;
 }

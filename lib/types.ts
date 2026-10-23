@@ -98,15 +98,13 @@ export interface Partner {
   deliverables?: PartnerDeliverable[];
   seminarSlotAssignments?: PartnerSeminarSlotAssignment[];
   portalLogin?: string;
-  /** Legacy plaintext — migrated to portalPasswordHash on load/save. */
-  portalTempPassword?: string;
-  /** Salted scrypt hash of the portal password */
-  portalPasswordHash?: string;
-  /** From Admin API — password exists but secret is never returned */
+  /** From Admin API — password exists but the secret is never returned. */
   hasPortalPassword?: boolean;
   portalPasswordChangedAt?: string;
-  /** Set when the first-login password prompt is dismissed with "I'll do it later". */
+  /** Historical skip timestamp. It does not allow dashboard access. */
   portalPasswordPromptSkippedAt?: string;
+  /** Admin-controlled portal switch. */
+  portalAccessEnabled?: boolean;
   /** Incremented whenever the portal password changes — invalidates sessions. */
   portalAuthVersion?: number;
   portalInviteEmail?: string;

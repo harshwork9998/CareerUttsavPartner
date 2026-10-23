@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { patchAdminPartner, pickPortalSyncPatch } from "@/lib/admin-api";
-import { hashPartnerPassword } from "@/lib/partner-password";
+import {
+  changeAdminPartnerPassword,
+  patchAdminPartner,
+  pickPortalSyncPatch,
+} from "@/lib/admin-api";
 import {
   getEvents,
   getPartnerById,
   getPartnerForSession,
-  bumpPartnerAuthVersion,
   mergeAdminPartners,
   setRepresentatives,
   setSeminarSpeakers,
@@ -67,21 +69,21 @@ export async function GET() {
       events
     );
 
-    const {
-    portalTempPassword: _pw,
-    portalPasswordHash: _hash,
-    ...safePartner
-  } = partner;
+    if (session.mustChangePassword) {
+      return NextResponse.json({
+        partner: { id: partner.id, name: partner.name },
+        packages: [],
+        events: [],
+        mustChangePassword: true,
+      });
+    }
 
     return NextResponse.json({
-      partner: safePartner,
+      partner,
       packages,
       events,
       uploadStatus: getPartnerPortalUploadStatus(partner),
-      mustChangePassword: !partner.portalPasswordChangedAt,
-      forcePasswordPrompt:
-        !partner.portalPasswordChangedAt &&
-        !partner.portalPasswordPromptSkippedAt,
+      mustChangePassword: false,
     });
   } catch (err) {
     console.error("[api/partner GET]", err);
@@ -120,13 +122,17 @@ export async function PATCH(request: Request) {
   }
 
   if (body.action === "skip_password_prompt") {
-    if (!partner.portalPasswordChangedAt) {
-      updatePartner(partner.id, {
-        portalPasswordPromptSkippedAt: new Date().toISOString(),
-      });
-      await syncPartnerPortalToAdmin(partner.id);
-    }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { error: "Set a new password before continuing." },
+      { status: 403 }
+    );
+  }
+
+  if (session.mustChangePassword && body.action !== "change_password") {
+    return NextResponse.json(
+      { error: "Set a new password before continuing." },
+      { status: 403 }
+    );
   }
 
   if (body.action === "change_password") {
@@ -137,22 +143,22 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
-    // Hash locally; sync plaintext once to Admin so Admin can re-hash & store.
-    updatePartner(partner.id, {
-      portalPasswordHash: hashPartnerPassword(password),
-      portalTempPassword: undefined,
-      portalPasswordChangedAt: new Date().toISOString(),
+    const changed = await changeAdminPartnerPassword({
+      partnerId: partner.id,
+      password,
     });
-    const bumped = bumpPartnerAuthVersion(partner.id);
-    await patchAdminPartner(partner.id, {
-      portalTempPassword: password,
-      portalPasswordChangedAt: new Date().toISOString(),
-      portalAuthVersion: bumped?.portalAuthVersion,
+    if (!changed.ok) {
+      return NextResponse.json({ error: changed.error }, { status: changed.status });
+    }
+    updatePartner(partner.id, {
+      portalPasswordChangedAt: changed.portalPasswordChangedAt,
+      portalAuthVersion: changed.portalAuthVersion,
+      hasPortalPassword: true,
     });
     return withSession(NextResponse.json({ ok: true }), {
       ...session,
       mustChangePassword: false,
-      authVersion: bumped?.portalAuthVersion ?? (session.authVersion ?? 0) + 1,
+      authVersion: changed.portalAuthVersion,
     });
   }
 

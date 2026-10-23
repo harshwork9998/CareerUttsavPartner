@@ -1,9 +1,5 @@
 import { generateId } from "@/lib/utils";
 import { fetchAdminEvents, fetchAdminPartners } from "@/lib/admin-api";
-import {
-  hashPartnerPassword,
-  isPartnerPasswordHash,
-} from "@/lib/partner-password";
 import { seedPartners, mockEvents } from "@/lib/seed-data";
 import type {
   Partner,
@@ -23,27 +19,21 @@ const globalStore = globalThis as unknown as {
   __cuEvents?: Event[];
 };
 
-function migratePartnerPassword(partner: Partner): Partner {
-  const plaintext = partner.portalTempPassword?.trim();
-  if (plaintext && !isPartnerPasswordHash(partner.portalPasswordHash)) {
-    return {
-      ...partner,
-      portalPasswordHash: hashPartnerPassword(plaintext),
-      portalTempPassword: undefined,
-    };
-  }
-  if (partner.portalTempPassword) {
-    const { portalTempPassword: _removed, ...rest } = partner;
-    return rest;
-  }
-  return partner;
+function withoutLocalSecrets(partner: Partner): Partner {
+  const {
+    portalTempPassword: _temp,
+    portalPasswordHash: _hash,
+    ...rest
+  } = partner as Partner & {
+    portalTempPassword?: string;
+    portalPasswordHash?: string;
+  };
+  return rest;
 }
 
 function partners(): Partner[] {
   if (!globalStore.__cuPartners) {
-    globalStore.__cuPartners = structuredClone(seedPartners).map(
-      migratePartnerPassword
-    );
+    globalStore.__cuPartners = structuredClone(seedPartners).map(withoutLocalSecrets);
   }
   return globalStore.__cuPartners;
 }
@@ -60,25 +50,20 @@ export async function mergeAdminPartners() {
   const store = partners();
   for (const adminPartner of fromAdmin) {
     const login = adminPartner.portalLogin?.toLowerCase();
-    const inviteEmail = adminPartner.portalInviteEmail?.toLowerCase();
     const idx = store.findIndex(
       (p) =>
         p.id === adminPartner.id ||
-        (login && p.portalLogin?.toLowerCase() === login) ||
-        (inviteEmail && p.portalInviteEmail?.toLowerCase() === inviteEmail)
+        (login && p.portalLogin?.toLowerCase() === login)
     );
     if (idx >= 0) {
       const existing = store[idx];
-      // Password hash stays local — set on login/password change, never from Admin sync.
-      store[idx] = {
+      store[idx] = withoutLocalSecrets({
         ...existing,
         ...adminPartner,
         id: adminPartner.id,
         portalLogin: adminPartner.portalLogin ?? existing.portalLogin,
         portalInviteEmail:
           adminPartner.portalInviteEmail ?? existing.portalInviteEmail,
-        portalPasswordHash: existing.portalPasswordHash,
-        portalTempPassword: undefined,
         portalInviteSentAt:
           adminPartner.portalInviteSentAt ?? existing.portalInviteSentAt,
         portalPasswordChangedAt:
@@ -102,9 +87,9 @@ export async function mergeAdminPartners() {
           adminPartner.portalSeminarSpeakers ?? existing.portalSeminarSpeakers,
         portalRepresentatives:
           adminPartner.portalRepresentatives ?? existing.portalRepresentatives,
-      };
+      });
     } else {
-      store.push(adminPartner);
+      store.push(withoutLocalSecrets(adminPartner));
     }
   }
 
@@ -115,21 +100,8 @@ export async function mergeAdminPartners() {
 }
 
 export function reloadPartnerStoreFromSeed() {
-  globalStore.__cuPartners = structuredClone(seedPartners).map(
-    migratePartnerPassword
-  );
+  globalStore.__cuPartners = structuredClone(seedPartners).map(withoutLocalSecrets);
   globalStore.__cuEvents = structuredClone(mockEvents);
-}
-
-/** Store a new portal password as a hash (never plaintext). */
-export function setPartnerPasswordHash(
-  partnerId: string,
-  password: string
-): Partner | null {
-  return updatePartner(partnerId, {
-    portalPasswordHash: hashPartnerPassword(password),
-    portalTempPassword: undefined,
-  });
 }
 
 export function getAllPartners() {
@@ -145,11 +117,7 @@ export function getPartnerByLogin(login: string) {
   if (!login?.trim()) return null;
   const normalized = login.trim().toLowerCase();
   return (
-    partners().find(
-      (p) =>
-        p.portalLogin?.toLowerCase() === normalized ||
-        p.portalInviteEmail?.toLowerCase() === normalized
-    ) ?? null
+    partners().find((p) => p.portalLogin?.toLowerCase() === normalized) ?? null
   );
 }
 
@@ -157,10 +125,7 @@ export function getPartnerByLogin(login: string) {
 export function partnerOwnsLogin(partner: Partner, login: string) {
   const normalized = login.trim().toLowerCase();
   if (!normalized) return false;
-  return (
-    partner.portalLogin?.toLowerCase() === normalized ||
-    partner.portalInviteEmail?.toLowerCase() === normalized
-  );
+  return partner.portalLogin?.toLowerCase() === normalized;
 }
 
 /**
@@ -202,9 +167,7 @@ export function upsertPartnerFromAdminAuth(input: {
   portalInviteSentAt?: string;
   portalPasswordChangedAt?: string;
   portalAuthVersion?: number;
-  /** Plaintext from this login only — hashed before store. */
-  portalPassword?: string;
-  portalPasswordHash?: string;
+  portalAccessEnabled?: boolean;
 }): Partner {
   const store = partners();
   const idx = store.findIndex(
@@ -227,11 +190,7 @@ export function upsertPartnerFromAdminAuth(input: {
           portalSeminarSpeakers: [],
         };
 
-  const portalPasswordHash = input.portalPassword
-    ? hashPartnerPassword(input.portalPassword)
-    : input.portalPasswordHash ?? base.portalPasswordHash;
-
-  const updated: Partner = {
+  const updated: Partner = withoutLocalSecrets({
     ...base,
     id: input.id,
     name: input.name || base.name,
@@ -244,9 +203,8 @@ export function upsertPartnerFromAdminAuth(input: {
     portalPasswordChangedAt:
       input.portalPasswordChangedAt ?? base.portalPasswordChangedAt,
     portalAuthVersion: input.portalAuthVersion ?? base.portalAuthVersion ?? 0,
-    portalPasswordHash,
-    portalTempPassword: undefined,
-  };
+    portalAccessEnabled: input.portalAccessEnabled ?? base.portalAccessEnabled,
+  });
 
   if (idx >= 0) store[idx] = updated;
   else store.push(updated);

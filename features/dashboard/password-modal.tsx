@@ -75,8 +75,10 @@ export function PasswordModal({
         </h2>
         <p className="mt-2 text-sm font-medium text-white/60">
           {allowLater
-            ? "Please change your temporary password after first login. You can also do this later from the navigation bar."
-            : "Choose a new password for your Partner Portal account."}
+            ? "Please change your temporary password after first login."
+            : onClose
+              ? "Choose a new password for your Partner Portal account."
+              : "Create a new password before opening the dashboard. This step cannot be skipped."}
         </p>
         {error ? (
           <p className="mt-4 rounded-xl bg-cu-red/20 px-3 py-2 text-sm font-semibold text-[#ffb4ae]">

@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { fetchAdminAuthState } from "@/lib/admin-api";
+import { partnerSessionIsActive, temporaryPasswordChangeRequired } from "@/lib/session-policy";
 import type { PortalSession } from "@/lib/types";
 
 const COOKIE = "cu_partner_session";
@@ -84,15 +86,27 @@ export async function getSession(): Promise<PortalSession | null> {
   const session = decodeSession(raw);
   if (!session?.partnerId || !session?.login) return null;
 
-  // Reject sessions issued before a password change/reset, and reject if the
-  // cookie's login no longer belongs to that partnerId (prevents cross-tenant).
-  const { getPartnerForSession } = await import("@/lib/partner-store");
-  const partner = getPartnerForSession(session);
-  if (!partner) return null;
-  const currentVersion = partner.portalAuthVersion ?? 0;
-  if ((session.authVersion ?? 0) !== currentVersion) return null;
+  const auth = await fetchAdminAuthState(session.partnerId);
+  if (!auth.ok) return null;
+  if (
+    !partnerSessionIsActive({
+      portalAccessEnabled: auth.state.portalAccessEnabled,
+      portalAuthVersion: auth.state.portalAuthVersion,
+      portalLogin: auth.state.portalLogin,
+      sessionAuthVersion: session.authVersion ?? 0,
+      sessionLogin: session.login,
+    })
+  ) {
+    return null;
+  }
 
-  return session;
+  return {
+    ...session,
+    authVersion: auth.state.portalAuthVersion,
+    mustChangePassword: temporaryPasswordChangeRequired(
+      auth.state.portalPasswordChangedAt
+    ),
+  };
 }
 
 /** Attach session on the response — required for Route Handlers. */

@@ -122,10 +122,7 @@ export function mapAdminPartnerToPortal(raw: AdminPartnerRecord): Partner | null
       raw.seminarSlotAssignments as Partner["seminarSlotAssignments"],
     portalLogin:
       typeof raw.portalLogin === "string" ? raw.portalLogin : undefined,
-    portalTempPassword:
-      typeof raw.portalTempPassword === "string"
-        ? raw.portalTempPassword
-        : undefined,
+    portalAccessEnabled: raw.portalAccessEnabled === true,
     hasPortalPassword:
       typeof raw.hasPortalPassword === "boolean"
         ? raw.hasPortalPassword
@@ -184,11 +181,7 @@ export async function fetchAdminPartners(): Promise<Partner[]> {
       .filter((partner): partner is Partner => {
         if (!partner) return false;
         // Activated once invite was sent OR credentials were issued in Admin.
-        return Boolean(
-          partner.portalInviteSentAt ||
-            (partner.portalLogin &&
-              (partner.hasPortalPassword || partner.portalTempPassword))
-        );
+        return partner.portalAccessEnabled === true;
       });
   } catch (error) {
     console.error(
@@ -227,11 +220,15 @@ export type AdminLoginResult =
 export async function loginAgainstAdmin(input: {
   login: string;
   password: string;
+  clientIp?: string;
 }): Promise<AdminLoginResult> {
   try {
     const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-forwarded-for": input.clientIp?.trim() || "unknown",
+      },
       body: JSON.stringify({
         login: input.login,
         password: input.password,
@@ -250,11 +247,7 @@ export async function loginAgainstAdmin(input: {
       return {
         ok: false,
         status: res.status || 401,
-        error:
-          typeof data.error === "string"
-            ? data.error
-            : "Invalid login or password",
-        code: data.code,
+        error: "Invalid login or password.",
       };
     }
 
@@ -305,8 +298,6 @@ export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
     portalSmsContent: partner.portalSmsContent,
     portalSeminarSpeakers: partner.portalSeminarSpeakers,
     portalRepresentatives: partner.portalRepresentatives,
-    portalPasswordChangedAt: partner.portalPasswordChangedAt,
-    portalPasswordPromptSkippedAt: partner.portalPasswordPromptSkippedAt,
   };
 }
 
@@ -327,5 +318,140 @@ export async function patchAdminPartner(
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+export type AdminAuthState = {
+  partnerId: string;
+  name: string;
+  portalLogin: string;
+  portalAccessEnabled: boolean;
+  portalAuthVersion: number;
+  portalPasswordChangedAt: string | null;
+  hasPortalPassword: boolean;
+};
+
+export async function fetchAdminAuthState(
+  partnerId: string
+): Promise<{ ok: true; state: AdminAuthState } | { ok: false; unreachable?: boolean }> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/auth-state`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...partnerServiceHeaders(),
+      },
+      body: JSON.stringify({ partnerId }),
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false };
+    const data = (await res.json()) as AdminAuthState & { ok?: boolean };
+    if (!data.partnerId) return { ok: false };
+    return { ok: true, state: data };
+  } catch {
+    return { ok: false, unreachable: true };
+  }
+}
+
+export async function requestAdminPasswordReset(login: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...partnerServiceHeaders(),
+      },
+      body: JSON.stringify({ login }),
+      cache: "no-store",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function previewAdminPasswordReset(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/reset-password/preview`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...partnerServiceHeaders(),
+      },
+      body: JSON.stringify({ token }),
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { valid?: boolean };
+    return data.valid === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function completeAdminPasswordReset(input: {
+  token: string;
+  password: string;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...partnerServiceHeaders(),
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: typeof data.error === "string" ? data.error : "Could not reset the password.",
+      };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, status: 503, error: "Could not reset the password." };
+  }
+}
+
+export async function changeAdminPartnerPassword(input: {
+  partnerId: string;
+  password: string;
+}): Promise<
+  | { ok: true; portalAuthVersion: number; portalPasswordChangedAt: string }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/partner-portal/change-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...partnerServiceHeaders(),
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      portalAuthVersion?: number;
+      portalPasswordChangedAt?: string;
+    };
+    if (!res.ok || typeof data.portalAuthVersion !== "number") {
+      return {
+        ok: false,
+        status: res.status || 502,
+        error: typeof data.error === "string" ? data.error : "Could not update password",
+      };
+    }
+    return {
+      ok: true,
+      portalAuthVersion: data.portalAuthVersion,
+      portalPasswordChangedAt: data.portalPasswordChangedAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return { ok: false, status: 503, error: "Could not update password" };
   }
 }
