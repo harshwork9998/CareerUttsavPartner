@@ -1,15 +1,26 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   deliverableOptionLabel,
   partnerFacingCopy,
 } from "@/lib/deliverable-labels";
 import { validateLinkedInProfile } from "@/lib/linkedin-profile";
+import {
+  getPartnerById,
+  removePortalDocument,
+  resetPartnerStore,
+  setRepresentatives,
+  setSeminarSpeakers,
+  updatePartner,
+  upsertPortalDocument,
+} from "@/lib/partner-store";
 import { isValidIndianMobile } from "@/lib/phone";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
+import { pickPortalSyncPatch } from "@/lib/admin-api";
+import { normalizePortalRepresentatives } from "@/lib/admin-api";
 import {
   canAddRepresentative,
   collectRepresentativeSubmission,
@@ -33,6 +44,86 @@ import {
 } from "@/lib/upload-policy";
 
 const root = path.resolve(__dirname, "..");
+
+afterEach(() => {
+  resetPartnerStore();
+});
+
+describe("partnership sync replacement", () => {
+  const person = (name: string) => ({
+    name,
+    designation: "Director",
+    phone: "9876543210",
+  });
+
+  it("stores only the representatives from the latest save", () => {
+    setRepresentatives("partner-001", "evt-001", 3, [
+      person("A"),
+      person("B"),
+      person("C"),
+    ]);
+    setRepresentatives("partner-001", "evt-001", 1, [person("A")]);
+    const saved = getPartnerById("partner-001")?.portalRepresentatives?.find(
+      (row) => row.eventId === "evt-001"
+    );
+    expect(saved?.count).toBe(1);
+    expect(saved?.representatives.map((row) => row.name)).toEqual(["A"]);
+  });
+
+  it("replaces speaker details, SMS content, and the current document", () => {
+    setSeminarSpeakers("partner-001", "evt-001", "sem-001-a", [
+      {
+        name: "New Speaker",
+        designation: "Dean",
+        contact: "9876543210",
+        introduction: "Updated bio",
+        linkedinProfile: "https://www.linkedin.com/in/new",
+      },
+    ]);
+    updatePartner("partner-001", { portalSmsContent: "Latest SMS" });
+    upsertPortalDocument("partner-001", {
+      kind: "logo",
+      label: "Logo",
+      fileName: "new-logo.png",
+      mimeType: "image/png",
+      url: "https://example.com/new-logo.png",
+      fileSizeBytes: 20,
+    });
+    const partner = getPartnerById("partner-001");
+    expect(partner?.portalSeminarSpeakers?.[0]?.speakers[0]?.name).toBe(
+      "New Speaker"
+    );
+    expect(partner?.portalSeminarSpeakers?.[0]?.speakers[0]?.linkedinProfile).toBe(
+      "https://www.linkedin.com/in/new"
+    );
+    expect(partner?.portalSmsContent).toBe("Latest SMS");
+    expect(partner?.portalDocuments?.map((doc) => doc.fileName)).toEqual([
+      "new-logo.png",
+    ]);
+
+    removePortalDocument("partner-001", "logo");
+    expect(getPartnerById("partner-001")?.portalDocuments ?? []).toEqual([]);
+
+    const patch = pickPortalSyncPatch(getPartnerById("partner-001")!);
+    expect(patch.portalSmsContent).toBe("Latest SMS");
+    expect(patch.portalDocuments).toEqual([]);
+    expect(patch).not.toHaveProperty("eventPartnerships");
+    expect(patch).not.toHaveProperty("representativeSlotCount");
+  });
+
+  it("reads an empty representative list as empty", () => {
+    expect(normalizePortalRepresentatives([])).toEqual([]);
+  });
+
+  it("reads the Admin allocation and deliverables from the partnership", () => {
+    const partner = getPartnerById("partner-001");
+    expect(partner?.eventPartnerships?.[0]?.seminarSlotCount).toBe(3);
+    expect(
+      representativeAllocationForEvent(partner?.eventPartnerships, "evt-001")
+    ).toBe(0);
+    expect(partner?.eventPartnerships?.[0]?.deliverables.length).toBeGreaterThan(0);
+  });
+});
 
 describe("representative allocation", () => {
   it("reads the admin allocation and rejects an independent partner count", () => {
@@ -59,20 +150,19 @@ describe("representative allocation", () => {
     expect(representativeFormCount(undefined)).toBe(0);
   });
 
-  it("keeps historical representative rows when the allocation is reduced", () => {
-    const merged = mergeRepresentativesPreservingHistory(
+  it("replaces the current representative list and does not merge removed people back", () => {
+    const saved = mergeRepresentativesPreservingHistory(
       [
         { name: "A", designation: "Dean", phone: "9876543210" },
         { name: "B", designation: "Lead", phone: "9876543211" },
+        { name: "C", designation: "Manager", phone: "9876543212" },
       ],
-      1,
-      [{ name: "Asha", designation: "Director", phone: "9876543212" }]
+      2,
+      [{ name: "A", designation: "Dean", phone: "9876543210" }]
     );
-    expect(merged[1]).toEqual({
-      name: "B",
-      designation: "Lead",
-      phone: "9876543211",
-    });
+    expect(saved).toEqual([
+      { name: "A", designation: "Dean", phone: "9876543210" },
+    ]);
   });
 });
 

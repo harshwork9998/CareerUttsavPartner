@@ -21,20 +21,18 @@ export function parseRepresentativeSlotCount(
 }
 
 /**
- * Replace representatives inside the current allocation and keep any
- * previously stored rows beyond that maximum.
+ * The saved list is the current submission. Removed people are not merged back
+ * from an older snapshot.
  */
 export function mergeRepresentativesPreservingHistory(
-  existing: RepresentativeFields[] | undefined,
+  _existing: RepresentativeFields[] | undefined,
   allocation: number,
   submitted: RepresentativeFields[]
 ): RepresentativeFields[] {
-  const prior = existing ?? [];
   const maximum = Number.isInteger(allocation) && allocation > 0 ? allocation : 0;
-  const visible = submitted
+  return submitted
     .filter((row) => !isBlankRepresentative(row))
     .slice(0, maximum);
-  return [...visible, ...prior.slice(maximum)];
 }
 
 export const REPRESENTATIVE_ROW_ERROR =

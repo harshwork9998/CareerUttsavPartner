@@ -92,10 +92,17 @@ export async function GET() {
   }
 }
 
-async function syncPartnerPortalToAdmin(partnerId: string) {
+async function syncPartnerPortalToAdmin(partnerId: string): Promise<boolean> {
   const partner = getPartnerById(partnerId);
-  if (!partner) return;
-  await patchAdminPartner(partner.id, pickPortalSyncPatch(partner));
+  if (!partner) return false;
+  return patchAdminPartner(partner.id, pickPortalSyncPatch(partner));
+}
+
+function syncFailedResponse() {
+  return NextResponse.json(
+    { error: "Could not save this update. Please try again." },
+    { status: 502 }
+  );
 }
 
 export async function PATCH(request: Request) {
@@ -165,7 +172,9 @@ export async function PATCH(request: Request) {
       }
     }
     updatePartner(partner.id, { [field]: nextValue });
-    await syncPartnerPortalToAdmin(partner.id);
+    if (!(await syncPartnerPortalToAdmin(partner.id))) {
+      return syncFailedResponse();
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -189,7 +198,9 @@ export async function PATCH(request: Request) {
       url,
       fileSizeBytes,
     });
-    await syncPartnerPortalToAdmin(partner.id);
+    if (!(await syncPartnerPortalToAdmin(partner.id))) {
+      return syncFailedResponse();
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -199,7 +210,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
     }
     removePortalDocument(partner.id, kind);
-    await syncPartnerPortalToAdmin(partner.id);
+    if (!(await syncPartnerPortalToAdmin(partner.id))) {
+      return syncFailedResponse();
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -289,7 +302,9 @@ export async function PATCH(request: Request) {
         linkedinProfile: speaker.linkedinProfile || undefined,
       }))
     );
-    await syncPartnerPortalToAdmin(partner.id);
+    if (!(await syncPartnerPortalToAdmin(partner.id))) {
+      return syncFailedResponse();
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -354,7 +369,9 @@ export async function PATCH(request: Request) {
       prepared.representatives.length,
       representatives
     );
-    await syncPartnerPortalToAdmin(partner.id);
+    if (!(await syncPartnerPortalToAdmin(partner.id))) {
+      return syncFailedResponse();
+    }
     return NextResponse.json({ ok: true });
   }
 

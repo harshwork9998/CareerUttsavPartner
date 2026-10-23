@@ -26,7 +26,10 @@ type DashboardPayload = {
 };
 
 async function fetchDashboard(): Promise<DashboardPayload> {
-  const res = await fetch("/api/partner", { credentials: "same-origin" });
+  const res = await fetch("/api/partner", {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
   if (res.status === 401) {
     throw new Error("unauthorized");
   }
@@ -47,6 +50,8 @@ export function DashboardView() {
     queryKey: ["partner-dashboard"],
     queryFn: fetchDashboard,
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {

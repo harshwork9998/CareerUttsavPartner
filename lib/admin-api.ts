@@ -69,7 +69,7 @@ export function normalizePortalRepresentatives(
         } satisfies PartnerRepresentativesSubmission;
       })
       .filter((r): r is PartnerRepresentativesSubmission => r !== null);
-    return rows.length > 0 ? rows : undefined;
+    return rows;
   }
 
   // Legacy partner-level blob — attach to first linked event when possible.

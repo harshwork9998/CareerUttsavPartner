@@ -89,9 +89,15 @@ export async function mergeAdminPartners() {
           existing.portalPasswordPromptSkippedAt,
         portalAuthVersion:
           adminPartner.portalAuthVersion ?? existing.portalAuthVersion,
-        // Preserve portal-uploaded content if Admin snapshot is older/empty
-        portalDocuments:
-          adminPartner.portalDocuments ?? existing.portalDocuments,
+        // Current Admin submission state replaces the local copy, including an
+        // empty list after the partner removes a submission.
+        portalDocuments: adminPartner.portalDocuments ?? existing.portalDocuments,
+        portalFasciaName:
+          adminPartner.portalFasciaName ?? existing.portalFasciaName,
+        portalWebsiteUrl:
+          adminPartner.portalWebsiteUrl ?? existing.portalWebsiteUrl,
+        portalSmsContent:
+          adminPartner.portalSmsContent ?? existing.portalSmsContent,
         portalSeminarSpeakers:
           adminPartner.portalSeminarSpeakers ?? existing.portalSeminarSpeakers,
         portalRepresentatives:
