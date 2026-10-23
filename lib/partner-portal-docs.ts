@@ -2,6 +2,7 @@ import type {
   Partner,
   PartnerSeminarSlotAssignment,
 } from "@/lib/types";
+import { PORTAL_UPLOAD_ACCEPT } from "@/lib/upload-policy";
 
 export const PORTAL_SUBMISSION_ITEMS = [
   {
@@ -21,7 +22,7 @@ export const PORTAL_SUBMISSION_ITEMS = [
     label: "Full page write up in event souvenir",
     type: "file" as const,
     docKind: "souvenir_writeup" as const,
-    accept: ".pdf,.doc,.docx",
+    accept: PORTAL_UPLOAD_ACCEPT,
     templateUrl: "/templates/souvenir-write-up-format.docx",
     templateLabel: "Download write-up format",
   },
@@ -30,7 +31,7 @@ export const PORTAL_SUBMISSION_ITEMS = [
     label: "Advertisement creative",
     type: "file" as const,
     docKind: "ad_creative" as const,
-    accept: "image/*,.pdf",
+    accept: PORTAL_UPLOAD_ACCEPT,
   },
   {
     key: "sms_content" as const,
@@ -40,7 +41,7 @@ export const PORTAL_SUBMISSION_ITEMS = [
   },
   {
     key: "speaker_details" as const,
-    label: "Speaker details for each seminar",
+    label: "Speaker details for each panel discussion",
     type: "speakers" as const,
   },
 ] as const;

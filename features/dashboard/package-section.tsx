@@ -4,6 +4,10 @@ import { Check } from "lucide-react";
 import { motion } from "framer-motion";
 
 import type { EventPackageSummary } from "@/lib/types";
+import {
+  deliverableOptionLabel,
+  partnerFacingCopy,
+} from "@/lib/deliverable-labels";
 
 export function PackageSection({
   packages,
@@ -68,7 +72,9 @@ export function PackageSection({
                   <div>
                     <p className="text-sm font-semibold text-ink">{item.label}</p>
                     {item.option ? (
-                      <p className="mt-0.5 text-xs text-ink-muted">{item.option}</p>
+                      <p className="mt-0.5 text-xs text-ink-muted">
+                        {partnerFacingCopy(deliverableOptionLabel(item.option))}
+                      </p>
                     ) : null}
                   </div>
                   <span className="rounded-full bg-cu-blue-soft px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-cu-blue-dark">

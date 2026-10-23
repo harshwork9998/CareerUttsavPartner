@@ -15,6 +15,10 @@ import {
 } from "lucide-react";
 
 import { PORTAL_SUBMISSION_ITEMS } from "@/lib/partner-portal-docs";
+import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
+import { SMS_CONTENT_MAX_LENGTH } from "@/lib/sms-content";
+import { PORTAL_UPLOAD_ACCEPT, validateUploadFile } from "@/lib/upload-policy";
+import { validateLinkedInProfile } from "@/lib/linkedin-profile";
 import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
 import { readFileAsDataUrl } from "@/lib/utils";
 import type {
@@ -84,7 +88,7 @@ export function SubmissionsSection({
         </h2>
         <p className="mt-2 text-sm font-medium leading-relaxed text-ink-soft">
           Share these details so production can prepare venue branding, souvenir,
-          and seminar rosters.
+          and panel discussion rosters.
         </p>
 
         <div className="mt-5">
@@ -170,16 +174,7 @@ export function SubmissionsSection({
           }
 
           if (item.type === "speakers") {
-            if (seminars.length === 0) {
-              return (
-                <div
-                  key={item.key}
-                  className="rounded-2xl border border-dashed border-line bg-paper-dim/60 px-4 py-4 text-sm text-ink-muted"
-                >
-                  {item.label} — available when seminar seats are allotted.
-                </div>
-              );
-            }
+            if (!hasAllocatedPanelSlots(packages)) return null;
             return (
               <div key={item.key} className="space-y-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -326,11 +321,13 @@ function TextAreaCard({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         rows={4}
-        maxLength={500}
-        placeholder="SMS text for participant mailers (max 500 characters)"
+        maxLength={SMS_CONTENT_MAX_LENGTH}
+        placeholder="SMS text for participant mailers"
         className="w-full resize-y rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-cu-blue focus:ring-2 focus:ring-cu-blue/15"
       />
-      <p className="mt-1 text-[11px] text-ink-muted">{draft.length}/500</p>
+      <p className="mt-1 text-[11px] tabular-nums text-ink-muted">
+        {draft.length} / {SMS_CONTENT_MAX_LENGTH}
+      </p>
       {dirty ? (
         <button
           type="button"
@@ -364,6 +361,7 @@ function FileUploadCard({
   saving: boolean;
   onUpload: (file: File) => Promise<void>;
 }) {
+  const [uploadError, setUploadError] = useState<string | null>(null);
   return (
     <div
       className={`rounded-2xl border-2 border-dashed px-4 py-4 transition ${
@@ -380,7 +378,18 @@ function FileUploadCard({
           disabled={saving}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) void onUpload(file);
+            e.target.value = "";
+            if (!file) return;
+            const error = validateUploadFile({
+              fileName: file.name,
+              fileSizeBytes: file.size,
+            });
+            if (error) {
+              setUploadError(error);
+              return;
+            }
+            setUploadError(null);
+            void onUpload(file);
           }}
         />
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-cu-red shadow-sm">
@@ -411,6 +420,9 @@ function FileUploadCard({
           {templateLabel ?? "Download format"}
         </a>
       ) : null}
+      {uploadError ? (
+        <p className="mt-2 text-xs font-semibold text-cu-red">{uploadError}</p>
+      ) : null}
     </div>
   );
 }
@@ -440,6 +452,7 @@ function SpeakerCard({
     ),
     introduction: s.introduction ?? "",
     photoUrl: s.photoUrl ?? "",
+    linkedinProfile: s.linkedinProfile ?? "",
   });
 
   const emptySeats = () =>
@@ -449,6 +462,7 @@ function SpeakerCard({
       contact: "",
       introduction: "",
       photoUrl: "",
+      linkedinProfile: "",
     }));
 
   const [speakers, setSpeakers] = useState<PartnerSeminarSpeakerDetail[]>(() =>
@@ -457,6 +471,7 @@ function SpeakerCard({
       : emptySeats()
   );
   const [attemptedSave, setAttemptedSave] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setSpeakers(
@@ -498,7 +513,16 @@ function SpeakerCard({
   };
 
   const handlePhoto = async (index: number, file?: File) => {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    const error = validateUploadFile({
+      fileName: file.name,
+      fileSizeBytes: file.size,
+    });
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setFormError(null);
     const photoUrl = await readFileAsDataUrl(file);
     patchSpeaker(index, { photoUrl });
   };
@@ -557,9 +581,17 @@ function SpeakerCard({
               showError={attemptedSave}
               onChange={(phone) => patchSpeaker(i, { contact: phone })}
             />
+            <input
+              placeholder="LinkedIn Profile"
+              value={speaker.linkedinProfile ?? ""}
+              onChange={(e) =>
+                patchSpeaker(i, { linkedinProfile: e.target.value })
+              }
+              className="cu-input !h-10"
+            />
             <div>
               <textarea
-                placeholder="Introduction — brief bio for the seminar programme"
+                placeholder="Introduction — brief bio for the panel discussion"
                 value={speaker.introduction ?? ""}
                 maxLength={500}
                 rows={4}
@@ -582,19 +614,36 @@ function SpeakerCard({
           onClick={() => {
             setAttemptedSave(true);
             if (!canSave) return;
+            const invalid = speakers.find((speaker) => {
+              const result = validateLinkedInProfile(speaker.linkedinProfile);
+              return !result.ok;
+            });
+            if (invalid) {
+              const result = validateLinkedInProfile(invalid.linkedinProfile);
+              setFormError(result.ok ? null : result.error);
+              return;
+            }
+            setFormError(null);
             void onSave(
               speakers
                 .filter(speakerComplete)
-                .map((s) => ({
-                  ...s,
-                  contact: normalizeIndianMobile(s.contact ?? ""),
-                }))
+                .map((s) => {
+                  const linkedIn = validateLinkedInProfile(s.linkedinProfile);
+                  return {
+                    ...s,
+                    contact: normalizeIndianMobile(s.contact ?? ""),
+                    linkedinProfile: linkedIn.ok ? linkedIn.value : "",
+                  };
+                })
             );
           }}
           className="mt-3 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white disabled:opacity-50"
         >
           Save
         </button>
+      ) : null}
+      {formError ? (
+        <p className="mt-2 text-xs font-semibold text-cu-red">{formError}</p>
       ) : null}
     </div>
   );
@@ -644,7 +693,7 @@ function SpeakerPhotoField({
         <input
           ref={inputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept={PORTAL_UPLOAD_ACCEPT}
           className="hidden"
           disabled={disabled}
           onChange={(e) => {
@@ -667,7 +716,7 @@ function SpeakerPhotoField({
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept={PORTAL_UPLOAD_ACCEPT}
         className="hidden"
         disabled={disabled}
         onChange={(e) => {
@@ -680,7 +729,6 @@ function SpeakerPhotoField({
         <ImagePlus className="h-5 w-5" />
       </span>
       <span className="text-xs font-bold text-ink">Add photo</span>
-      <span className="text-[11px] text-ink-muted">PNG or JPG</span>
     </button>
   );
 }

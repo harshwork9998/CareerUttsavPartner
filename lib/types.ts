@@ -21,6 +21,7 @@ export interface PartnerEventPartnership {
   sponsorshipTier?: SponsorshipTier;
   deliverables: PartnerDeliverable[];
   seminarSlotCount: number;
+  representativeSlotCount?: number;
 }
 
 export interface PartnerSeminarSlotAssignment {
@@ -55,6 +56,8 @@ export interface PartnerSeminarSpeakerDetail {
   designation?: string;
   contact?: string;
   introduction?: string;
+  /** Optional LinkedIn profile URL. */
+  linkedinProfile?: string;
   /** Data URL or hosted URL for the speaker headshot. */
   photoUrl?: string;
   phone?: string;
@@ -71,6 +74,7 @@ export interface PartnerSeminarSpeakerSubmission {
 /** On-ground team attending Career Uttsav with the partner. */
 export interface PartnerRepresentative {
   name: string;
+  designation?: string;
   phone: string;
 }
 
@@ -150,6 +154,7 @@ export type EventPackageSummary = {
     hall: number;
   }>;
   slotBudget: number;
+  representativeSlotCount: number;
   seatsAssigned: number;
 };
 

@@ -8,6 +8,9 @@ import {
   isValidIndianMobile,
   normalizeIndianMobile,
 } from "@/lib/phone";
+import {
+  representativeFormCount,
+} from "@/lib/representative-allocation";
 import type {
   EventPackageSummary,
   Partner,
@@ -15,30 +18,31 @@ import type {
   PartnerRepresentativesSubmission,
 } from "@/lib/types";
 
-function emptyRep(): PartnerRepresentative {
-  return { name: "", phone: "" };
-}
-
-function normalizeSubmission(
-  value?: PartnerRepresentativesSubmission
-): { count: number; representatives: PartnerRepresentative[] } {
-  const count = Math.max(0, Math.floor(value?.count ?? 0));
-  const rows = value?.representatives ?? [];
-  const representatives = Array.from({ length: count }, (_, i) => ({
-    name: rows[i]?.name ?? "",
-    phone: normalizeIndianMobile(rows[i]?.phone ?? ""),
+function visibleRepresentatives(
+  allocation: number,
+  saved?: PartnerRepresentativesSubmission
+): PartnerRepresentative[] {
+  const rows = saved?.representatives ?? [];
+  return Array.from({ length: allocation }, (_, index) => ({
+    name: rows[index]?.name ?? "",
+    designation: rows[index]?.designation ?? "",
+    phone: normalizeIndianMobile(rows[index]?.phone ?? ""),
   }));
-  return { count, representatives };
 }
 
 function isComplete(
-  count: number,
+  allocation: number,
   representatives: PartnerRepresentative[]
 ) {
-  if (count < 1) return false;
-  if (representatives.length !== count) return false;
-  return representatives.every(
-    (r) => r.name.trim().length > 0 && isValidIndianMobile(r.phone)
+  const formCount = representativeFormCount(allocation);
+  if (formCount < 1) return true;
+  const visible = representatives.slice(0, formCount);
+  if (visible.length !== formCount) return false;
+  return visible.every(
+    (row) =>
+      row.name.trim().length > 0 &&
+      Boolean(row.designation?.trim()) &&
+      isValidIndianMobile(row.phone)
   );
 }
 
@@ -47,6 +51,7 @@ function EventRepresentativesForm({
   city,
   title,
   showCityHeader,
+  allocation,
   savedSubmission,
   saving,
   onSave,
@@ -55,6 +60,7 @@ function EventRepresentativesForm({
   city: string;
   title: string;
   showCityHeader: boolean;
+  allocation: number;
   savedSubmission?: PartnerRepresentativesSubmission;
   saving: boolean;
   onSave: (payload: {
@@ -63,76 +69,29 @@ function EventRepresentativesForm({
     representatives: PartnerRepresentative[];
   }) => Promise<void>;
 }) {
-  const saved = normalizeSubmission(savedSubmission);
-  const initialCount = saved.count || 1;
-  const [countInput, setCountInput] = useState(String(initialCount));
-  const [representatives, setRepresentatives] = useState(
-    saved.representatives.length
-      ? saved.representatives
-      : [emptyRep()]
+  const [representatives, setRepresentatives] = useState(() =>
+    visibleRepresentatives(allocation, savedSubmission)
   );
   const [attemptedSave, setAttemptedSave] = useState(false);
 
   useEffect(() => {
-    const next = normalizeSubmission(savedSubmission);
-    const nextCount = next.count || 1;
-    setCountInput(String(nextCount));
-    setRepresentatives(
-      next.representatives.length
-        ? next.representatives
-        : Array.from({ length: nextCount }, emptyRep)
-    );
+    setRepresentatives(visibleRepresentatives(allocation, savedSubmission));
     setAttemptedSave(false);
-  }, [savedSubmission]);
+  }, [allocation, savedSubmission]);
 
-  const syncRepRows = (nextCount: number) => {
-    const clamped = Math.max(1, nextCount);
-    setRepresentatives((prev) => {
-      if (prev.length === clamped) return prev;
-      if (prev.length < clamped) {
-        return [
-          ...prev,
-          ...Array.from({ length: clamped - prev.length }, emptyRep),
-        ];
-      }
-      return prev.slice(0, clamped);
-    });
-  };
+  if (representativeFormCount(allocation) < 1) return null;
 
-  const onCountChange = (raw: string) => {
-    if (raw === "") {
-      setCountInput("");
-      return;
-    }
-    if (!/^\d+$/.test(raw)) return;
-    setCountInput(raw);
-    const parsed = Number(raw);
-    if (parsed >= 1) syncRepRows(parsed);
-  };
+  const rowsForSave = representatives.slice(0, allocation);
+  const savedVisible = visibleRepresentatives(allocation, savedSubmission);
+  const savedDone = isComplete(allocation, savedVisible);
+  const canSave = isComplete(allocation, rowsForSave);
+  const dirty = JSON.stringify(rowsForSave) !== JSON.stringify(savedVisible);
 
-  const onCountBlur = () => {
-    const parsed = Math.max(1, Math.floor(Number(countInput)) || 1);
-    setCountInput(String(parsed));
-    syncRepRows(parsed);
-  };
-
-  const patchRep = (
-    index: number,
-    patch: Partial<PartnerRepresentative>
-  ) => {
+  const patchRep = (index: number, patch: Partial<PartnerRepresentative>) => {
     setRepresentatives((prev) =>
       prev.map((row, i) => (i === index ? { ...row, ...patch } : row))
     );
   };
-
-  const effectiveCount = Math.max(1, Math.floor(Number(countInput)) || 1);
-  const rowsForSave = representatives.slice(0, effectiveCount);
-  const savedDone = isComplete(saved.count, saved.representatives);
-  const canSave = isComplete(effectiveCount, rowsForSave);
-  const dirty =
-    effectiveCount !== saved.count ||
-    JSON.stringify(rowsForSave) !==
-      JSON.stringify(saved.representatives);
 
   return (
     <div
@@ -165,74 +124,64 @@ function EventRepresentativesForm({
         </div>
       ) : null}
 
-      <div className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-bold text-ink-soft">
-            Number of representatives
-            {showCityHeader ? ` · ${city}` : ""}
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={countInput}
-            onChange={(e) => onCountChange(e.target.value)}
-            onBlur={onCountBlur}
-            className="cu-input !h-11 max-w-[140px]"
-          />
-        </div>
-
-        <div className="space-y-3">
-          {rowsForSave.map((rep, i) => (
-            <div
-              key={i}
-              className={`rounded-2xl border border-line p-4 ${
-                showCityHeader ? "bg-paper-dim/40" : "bg-paper"
-              }`}
-            >
-              <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-cu-red">
-                Representative {i + 1}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  type="text"
-                  placeholder="Name"
-                  value={rep.name}
-                  onChange={(e) => patchRep(i, { name: e.target.value })}
-                  className="cu-input !h-10"
-                />
-                <PhoneField
-                  value={rep.phone}
-                  showError={attemptedSave}
-                  onChange={(phone) => patchRep(i, { phone })}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {dirty ? (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => {
-              setAttemptedSave(true);
-              if (!canSave) return;
-              void onSave({
-                eventId,
-                count: effectiveCount,
-                representatives: rowsForSave.map((r) => ({
-                  name: r.name.trim(),
-                  phone: normalizeIndianMobile(r.phone),
-                })),
-              });
-            }}
-            className="h-10 rounded-full bg-cu-red px-5 text-sm font-bold text-white disabled:opacity-50"
+      <div className="space-y-3">
+        {rowsForSave.map((rep, i) => (
+          <div
+            key={i}
+            className={`rounded-2xl border border-line p-4 ${
+              showCityHeader ? "bg-paper-dim/40" : "bg-paper"
+            }`}
           >
-            Save
-          </button>
-        ) : null}
+            <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-cu-red">
+              Representative {i + 1}
+            </p>
+            <div className="grid gap-3">
+              <input
+                type="text"
+                placeholder="Name"
+                value={rep.name}
+                onChange={(e) => patchRep(i, { name: e.target.value })}
+                className="cu-input !h-10"
+              />
+              <input
+                type="text"
+                placeholder="Designation"
+                value={rep.designation ?? ""}
+                onChange={(e) => patchRep(i, { designation: e.target.value })}
+                className="cu-input !h-10"
+              />
+              <PhoneField
+                value={rep.phone}
+                showError={attemptedSave}
+                onChange={(phone) => patchRep(i, { phone })}
+              />
+            </div>
+          </div>
+        ))}
       </div>
+
+      {dirty ? (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => {
+            setAttemptedSave(true);
+            if (!canSave) return;
+            void onSave({
+              eventId,
+              count: allocation,
+              representatives: rowsForSave.map((row) => ({
+                name: row.name.trim(),
+                designation: row.designation?.trim() ?? "",
+                phone: normalizeIndianMobile(row.phone),
+              })),
+            });
+          }}
+          className="mt-4 h-10 rounded-full bg-cu-red px-5 text-sm font-bold text-white disabled:opacity-50"
+        >
+          Save
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -254,14 +203,18 @@ export function RepresentativesSection({
 }) {
   const multiCity = packages.length > 1;
   const submissions = partner.portalRepresentatives ?? [];
-
   const allDone =
     packages.length > 0 &&
     packages.every((pkg) => {
-      const saved = normalizeSubmission(
-        submissions.find((s) => s.eventId === pkg.eventId)
+      const allocation = pkg.representativeSlotCount ?? 0;
+      if (representativeFormCount(allocation) < 1) return true;
+      return isComplete(
+        allocation,
+        visibleRepresentatives(
+          allocation,
+          submissions.find((row) => row.eventId === pkg.eventId)
+        )
       );
-      return isComplete(saved.count, saved.representatives);
     });
 
   return (
@@ -278,12 +231,10 @@ export function RepresentativesSection({
             Event representatives
           </h2>
           <p className="mt-2 text-sm font-medium text-ink-soft">
-            {multiCity
-              ? "Tell us who from your team will attend each city edition, with a name and phone number for each, so we can plan arrangements."
-              : "Tell us how many people from your team will attend Career Uttsav, with a name and phone number for each, so we can plan arrangements."}
+            Tell us how many people from your team will attend Career Uttsav.
           </p>
         </div>
-        {allDone ? (
+        {allDone && packages.some((pkg) => (pkg.representativeSlotCount ?? 0) > 0) ? (
           <Check className="h-5 w-5 shrink-0 text-cu-green" strokeWidth={3} />
         ) : null}
       </div>
@@ -302,8 +253,9 @@ export function RepresentativesSection({
               city={pkg.city}
               title={pkg.title}
               showCityHeader={multiCity}
+              allocation={pkg.representativeSlotCount ?? 0}
               savedSubmission={submissions.find(
-                (s) => s.eventId === pkg.eventId
+                (row) => row.eventId === pkg.eventId
               )}
               saving={saving}
               onSave={onSave}

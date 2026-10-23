@@ -45,6 +45,12 @@ export function buildEventPackageSummaries(
         })),
       seminars,
       slotBudget: ep.seminarSlotCount ?? 0,
+      representativeSlotCount:
+        typeof ep.representativeSlotCount === "number" &&
+        Number.isInteger(ep.representativeSlotCount) &&
+        ep.representativeSlotCount > 0
+          ? ep.representativeSlotCount
+          : 0,
       seatsAssigned: seminars.reduce((s, row) => s + row.slots, 0),
     });
   }

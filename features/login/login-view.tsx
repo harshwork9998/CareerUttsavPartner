@@ -74,7 +74,7 @@ export function LoginView({
           </h1>
           <p className="mt-4 max-w-md text-base font-medium leading-relaxed text-ink-soft">
             Track sponsorship deliverables, upload marketing assets and manage
-            seminar details through your dedicated Partner Portal.
+            panel discussion details through your dedicated Partner Portal.
           </p>
         </motion.div>
 

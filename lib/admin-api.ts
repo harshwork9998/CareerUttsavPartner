@@ -30,9 +30,10 @@ function normalizeRepresentativeRows(
 ): PartnerRepresentative[] {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
-    const r = row as { name?: unknown; phone?: unknown };
+    const r = row as { name?: unknown; designation?: unknown; phone?: unknown };
     return {
       name: typeof r.name === "string" ? r.name : "",
+      designation: typeof r.designation === "string" ? r.designation : "",
       phone: typeof r.phone === "string" ? r.phone : "",
     };
   });

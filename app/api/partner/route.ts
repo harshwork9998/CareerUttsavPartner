@@ -20,8 +20,18 @@ import {
 } from "@/lib/partner-event-config";
 import { getSession, withSession, withoutSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
+import { validateLinkedInProfile } from "@/lib/linkedin-profile";
 import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
+import {
+  mergeRepresentativesPreservingHistory,
+  partnerRepresentativeCountError,
+  representativeAllocationForEvent,
+} from "@/lib/representative-allocation";
+import { validateSmsContent } from "@/lib/sms-content";
 import type { PartnerPortalDocument } from "@/lib/types";
+import {
+  validateStoredUpload,
+} from "@/lib/upload-policy";
 
 function invalidSessionResponse() {
   // Clear the cookie so /login does not bounce straight back to /dashboard.
@@ -147,20 +157,37 @@ export async function PATCH(request: Request) {
     if (!field) {
       return NextResponse.json({ error: "Invalid field" }, { status: 400 });
     }
-    updatePartner(partner.id, { [field]: String(body.value ?? "") });
+    const nextValue = String(body.value ?? "");
+    if (field === "portalSmsContent") {
+      const smsError = validateSmsContent(nextValue);
+      if (smsError) {
+        return NextResponse.json({ error: smsError }, { status: 400 });
+      }
+    }
+    updatePartner(partner.id, { [field]: nextValue });
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "upload_document") {
-    const { kind, label, fileName, mimeType, url, fileSizeBytes } = body;
-    upsertPortalDocument(partner.id, {
-      kind,
-      label,
+    const fileName = String(body.fileName ?? "");
+    const fileSizeBytes = Number(body.fileSizeBytes) || 0;
+    const url = String(body.url ?? "");
+    const uploadError = validateStoredUpload({
       fileName,
-      mimeType,
+      fileSizeBytes,
       url,
-      fileSizeBytes: Number(fileSizeBytes) || 0,
+    });
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError }, { status: 400 });
+    }
+    upsertPortalDocument(partner.id, {
+      kind: body.kind,
+      label: body.label,
+      fileName,
+      mimeType: body.mimeType,
+      url,
+      fileSizeBytes,
     });
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
@@ -177,22 +204,60 @@ export async function PATCH(request: Request) {
   }
 
   if (body.action === "seminar_speakers") {
-    const speakers = (Array.isArray(body.speakers) ? body.speakers : []).map(
+    const speakers: Array<{
+      name: string;
+      designation: string;
+      contact: string;
+      introduction: string;
+      photoUrl: string;
+      linkedinProfile: string;
+      linkedInOk: boolean;
+      linkedInError: string;
+    }> = (Array.isArray(body.speakers) ? body.speakers : []).map(
       (s: {
         name?: string;
         designation?: string;
         contact?: string;
         introduction?: string;
         photoUrl?: string;
-      }) => ({
-        ...s,
-        name: String(s.name ?? "").trim(),
-        designation: String(s.designation ?? "").trim(),
-        contact: normalizeIndianMobile(String(s.contact ?? "")),
-        introduction: String(s.introduction ?? "").trim(),
-        photoUrl: String(s.photoUrl ?? "").trim(),
-      })
+        linkedinProfile?: string;
+      }) => {
+        const linkedIn = validateLinkedInProfile(s.linkedinProfile);
+        return {
+          name: String(s.name ?? "").trim(),
+          designation: String(s.designation ?? "").trim(),
+          contact: normalizeIndianMobile(String(s.contact ?? "")),
+          introduction: String(s.introduction ?? "").trim(),
+          photoUrl: String(s.photoUrl ?? "").trim(),
+          linkedinProfile: linkedIn.ok ? linkedIn.value : String(s.linkedinProfile ?? ""),
+          linkedInOk: linkedIn.ok,
+          linkedInError: linkedIn.ok ? "" : linkedIn.error,
+        };
+      }
     );
+
+    const invalidLink = speakers.find((speaker) => !speaker.linkedInOk);
+    if (invalidLink) {
+      return NextResponse.json(
+        { error: invalidLink.linkedInError },
+        { status: 400 }
+      );
+    }
+
+    const photoError = speakers
+      .map((speaker) =>
+        speaker.photoUrl
+          ? validateStoredUpload({
+              fileName: "speaker-photo.png",
+              fileSizeBytes: 0,
+              url: speaker.photoUrl,
+            })
+          : null
+      )
+      .find((error) => error);
+    if (photoError) {
+      return NextResponse.json({ error: photoError }, { status: 400 });
+    }
 
     if (
       speakers.length === 0 ||
@@ -215,7 +280,14 @@ export async function PATCH(request: Request) {
       partner.id,
       body.eventId,
       body.seminarId,
-      speakers
+      speakers.map((speaker) => ({
+        name: speaker.name,
+        designation: speaker.designation,
+        contact: speaker.contact,
+        introduction: speaker.introduction,
+        photoUrl: speaker.photoUrl,
+        linkedinProfile: speaker.linkedinProfile || undefined,
+      }))
     );
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
@@ -243,31 +315,53 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const count = Math.max(0, Math.floor(Number(body.count) || 0));
+    const allocation = representativeAllocationForEvent(
+      partner.eventPartnerships,
+      eventId
+    );
+    const countError = partnerRepresentativeCountError(allocation, body.count);
+    if (countError) {
+      return NextResponse.json({ error: countError }, { status: 400 });
+    }
+
     const rows = (
       Array.isArray(body.representatives) ? body.representatives : []
-    ) as Array<{ name?: string; phone?: string }>;
-    const representatives: Array<{ name: string; phone: string }> = rows
-      .slice(0, count)
-      .map((row) => ({
-        name: String(row.name ?? "").trim(),
-        phone: normalizeIndianMobile(String(row.phone ?? "")),
-      }));
+    ) as Array<{ name?: string; designation?: string; phone?: string }>;
+    const submitted = rows.slice(0, allocation).map((row) => ({
+      name: String(row.name ?? "").trim(),
+      designation: String(row.designation ?? "").trim(),
+      phone: normalizeIndianMobile(String(row.phone ?? "")),
+    }));
 
     if (
-      count < 1 ||
-      representatives.length !== count ||
-      representatives.some(
-        (r) => !r.name || !isValidIndianMobile(r.phone)
+      submitted.length !== allocation ||
+      submitted.some(
+        (r) => !r.name || !r.designation || !isValidIndianMobile(r.phone)
       )
     ) {
       return NextResponse.json(
-        { error: "Enter a valid 10-digit mobile number for each representative" },
+        {
+          error:
+            "Enter a name, designation, and valid 10-digit mobile number for each representative",
+        },
         { status: 400 }
       );
     }
 
-    setRepresentatives(partner.id, eventId, count, representatives);
+    const existing = (partner.portalRepresentatives ?? []).find(
+      (row) => row.eventId === eventId
+    );
+    const representatives = mergeRepresentativesPreservingHistory(
+      (existing?.representatives ?? []).map((row) => ({
+        name: row.name,
+        designation: row.designation ?? "",
+        phone: row.phone,
+      })),
+      allocation,
+      submitted
+    );
+
+    setRepresentatives(partner.id, eventId, allocation, representatives);
     await syncPartnerPortalToAdmin(partner.id);
     return NextResponse.json({ ok: true });
   }

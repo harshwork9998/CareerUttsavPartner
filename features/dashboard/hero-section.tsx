@@ -5,6 +5,7 @@ import { ImagePlus, X } from "lucide-react";
 import { motion } from "framer-motion";
 
 import type { EventPackageSummary, Partner } from "@/lib/types";
+import { PORTAL_UPLOAD_ACCEPT, validateUploadFile } from "@/lib/upload-policy";
 
 export function HeroSection({
   partner,
@@ -23,6 +24,7 @@ export function HeroSection({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const firstName = partner.name.split(" ")[0] || partner.name;
   const eventPartnerships =
@@ -43,7 +45,16 @@ export function HeroSection({
         ];
 
   const handleFile = async (file?: File) => {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    const error = validateUploadFile({
+      fileName: file.name,
+      fileSizeBytes: file.size,
+    });
+    if (error) {
+      setUploadError(error);
+      return;
+    }
+    setUploadError(null);
     await onLogoUpload(file);
   };
 
@@ -108,7 +119,7 @@ export function HeroSection({
                 <input
                   ref={inputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  accept={PORTAL_UPLOAD_ACCEPT}
                   className="hidden"
                   onChange={(e) => void handleFile(e.target.files?.[0])}
                 />
@@ -129,8 +140,8 @@ export function HeroSection({
                 Add your logo
               </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-ink-soft">
-                PNG or SVG with a transparent background works best for stall
-                boards and venue creatives.
+                A transparent background works best for stall boards and venue
+                creatives.
               </p>
 
               <button
@@ -156,7 +167,7 @@ export function HeroSection({
                 <input
                   ref={inputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  accept={PORTAL_UPLOAD_ACCEPT}
                   className="hidden"
                   onChange={(e) => void handleFile(e.target.files?.[0])}
                 />
@@ -170,8 +181,16 @@ export function HeroSection({
                   Drop a file here or click to upload
                 </p>
               </button>
+              {uploadError ? (
+                <p className="mt-2 text-xs font-semibold text-cu-red">
+                  {uploadError}
+                </p>
+              ) : null}
             </div>
           )}
+          {logoUrl && uploadError ? (
+            <p className="mt-2 text-xs font-semibold text-cu-red">{uploadError}</p>
+          ) : null}
         </motion.div>
       </div>
     </motion.section>
