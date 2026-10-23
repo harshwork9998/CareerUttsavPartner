@@ -15,7 +15,7 @@ export const mockEvents: Event[] = [
     seminars: [
       {
         id: "sem-001-a",
-        title: "How to select a stream – Art – Science – Commerce?",
+        title: "Do What You Love, Love What You Do",
         date: "2026-08-15",
         startTime: "10:00",
         endTime: "11:00",
@@ -23,7 +23,7 @@ export const mockEvents: Event[] = [
       },
       {
         id: "sem-001-b",
-        title: "Real Careers with Artificial Intelligence",
+        title: "Engineering Next: What’s Ahead?",
         date: "2026-08-15",
         startTime: "11:30",
         endTime: "12:30",
@@ -31,7 +31,7 @@ export const mockEvents: Event[] = [
       },
       {
         id: "sem-001-c",
-        title: "All about Overseas Education",
+        title: "Your Journey to Study Abroad",
         date: "2026-08-16",
         startTime: "10:00",
         endTime: "11:00",
@@ -39,7 +39,7 @@ export const mockEvents: Event[] = [
       },
       {
         id: "sem-001-d",
-        title: "Medicine in the 21st century",
+        title: "Careers in Medicine & Health Sciences",
         date: "2026-08-16",
         startTime: "14:00",
         endTime: "15:00",
@@ -63,7 +63,6 @@ const bangaloreDeliverables = [
 /** Christ University demo login (Bangalore / evt-001). */
 export const MULTI_EVENT_DEMO = {
   login: "anitha.rao@christuniversity.in",
-  password: "ChristDemo9x",
   name: "Christ University",
 };
 
@@ -89,7 +88,8 @@ export const seedPartners: Partner[] = [
       { eventId: "evt-001", seminarId: "sem-001-b", slots: 2 },
     ],
     portalLogin: MULTI_EVENT_DEMO.login,
-    portalTempPassword: MULTI_EVENT_DEMO.password,
+    portalAccessEnabled: true,
+    hasPortalPassword: true,
     portalInviteEmail: MULTI_EVENT_DEMO.login,
     portalInviteSentAt: "2026-07-15T10:00:00+05:30",
     portalFasciaName: "CHRIST (DEEMED TO BE UNIVERSITY)",
@@ -144,7 +144,8 @@ export const seedPartners: Partner[] = [
       { eventId: "evt-001", seminarId: "sem-001-c", slots: 1 },
     ],
     portalLogin: "kavitha.nair@pes.edu",
-    portalTempPassword: "PesPortal9x",
+    portalAccessEnabled: true,
+    hasPortalPassword: true,
     portalInviteEmail: "kavitha.nair@pes.edu",
     portalInviteSentAt: "2026-06-29T10:00:00+05:30",
     portalFasciaName: "PES UNIVERSITY",
@@ -197,7 +198,8 @@ export const seedPartners: Partner[] = [
       { eventId: "evt-001", seminarId: "sem-001-b", slots: 1 },
     ],
     portalLogin: "partnerships@rvu.edu.in",
-    portalTempPassword: "TempPass9x",
+    portalAccessEnabled: true,
+    hasPortalPassword: true,
     portalInviteEmail: "partnerships@rvu.edu.in",
     portalInviteSentAt: "2026-07-10T10:00:00+05:30",
     portalDocuments: [],
@@ -205,12 +207,3 @@ export const seedPartners: Partner[] = [
   },
 ];
 
-export function findPartnerByCredentials(login: string, password: string) {
-  const normalized = login.trim().toLowerCase();
-  return seedPartners.find((p) => {
-    const loginMatch =
-      p.portalLogin?.toLowerCase() === normalized ||
-      p.portalInviteEmail?.toLowerCase() === normalized;
-    return loginMatch && p.portalTempPassword === password;
-  });
-}
