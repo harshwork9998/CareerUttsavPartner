@@ -339,10 +339,10 @@ describe("uploads and advertisement labels", () => {
 
   it("shows the Careers After +2 dimensions", () => {
     expect(deliverableOptionLabel("full page")).toBe(
-      'Full Page (6.5" W × 4.75" H)'
+      'Full Page (6.5" W × 9.5" H)'
     );
     expect(deliverableOptionLabel("half page")).toBe(
-      'Half Page (6.5" W × 9.5" H)'
+      'Half Page (6.5" W × 4.75" H)'
     );
   });
 });

@@ -1,6 +1,6 @@
 const BOOK_AD_LABELS: Record<string, string> = {
-  "full page": 'Full Page (6.5" W × 4.75" H)',
-  "half page": 'Half Page (6.5" W × 9.5" H)',
+  "full page": 'Full Page (6.5" W × 9.5" H)',
+  "half page": 'Half Page (6.5" W × 4.75" H)',
 };
 
 export function deliverableOptionLabel(option: string | undefined): string {
