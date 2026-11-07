@@ -22,7 +22,7 @@ export function buildEventPackageSummaries(
         const seminar = event.seminars.find((s) => s.id === a.seminarId);
         return {
           id: a.seminarId,
-          title: a.seminarTitle ?? seminar?.title ?? a.seminarId,
+          title: seminar?.title ?? a.seminarTitle ?? a.seminarId,
           slots: a.slots,
           date: seminar?.date ?? "",
           startTime: seminar?.startTime ?? "",

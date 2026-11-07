@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   changeAdminPartnerPassword,
+  fetchAdminSeminarTopics,
   patchAdminPartner,
   pickPortalSyncPatch,
+  saveAdminSeminarTopics,
 } from "@/lib/admin-api";
 import {
   getEvents,
@@ -30,6 +32,8 @@ import {
   representativeAllocationForEvent,
 } from "@/lib/representative-allocation";
 import { validateSmsContent } from "@/lib/sms-content";
+import { partnerSeminarSpeakerTargetError } from "@/lib/seminar-speaker-guard";
+import { seminarTopicActorId } from "@/lib/seminar-topics";
 import type { PartnerPortalDocument } from "@/lib/types";
 import {
   validateStoredUpload,
@@ -78,10 +82,13 @@ export async function GET() {
       });
     }
 
+    const seminarTopics = await fetchAdminSeminarTopics(partner.id);
+
     return NextResponse.json({
       partner,
       packages,
       events,
+      seminarTopics,
       uploadStatus: getPartnerPortalUploadStatus(partner),
       mustChangePassword: false,
     });
@@ -222,6 +229,18 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body.action === "seminar_topics") {
+    const saved = await saveAdminSeminarTopics(seminarTopicActorId(partner.id, body), {
+      topics: Array.isArray(body.topics) ? body.topics : [],
+      confirm: body.confirm === true,
+    });
+    if (!saved.ok) {
+      return NextResponse.json({ error: saved.error }, { status: saved.status });
+    }
+    await mergeAdminPartners();
+    return NextResponse.json({ ok: true, seminarTopics: saved.catalog });
+  }
+
   if (body.action === "seminar_speakers") {
     const speakers: Array<{
       name: string;
@@ -276,6 +295,16 @@ export async function PATCH(request: Request) {
       .find((error) => error);
     if (photoError) {
       return NextResponse.json({ error: photoError }, { status: 400 });
+    }
+
+    const speakerTargetError = partnerSeminarSpeakerTargetError({
+      partner,
+      events: getEvents(),
+      eventId: String(body.eventId ?? ""),
+      seminarId: String(body.seminarId ?? ""),
+    });
+    if (speakerTargetError) {
+      return NextResponse.json({ error: speakerTargetError }, { status: 400 });
     }
 
     if (

@@ -1,3 +1,4 @@
+import type { PartnerSeminarTopicCatalog } from "@/lib/seminar-topics";
 import type {
   Partner,
   PartnerRepresentative,
@@ -120,6 +121,10 @@ export function mapAdminPartnerToPortal(raw: AdminPartnerRecord): Partner | null
     deliverables: raw.deliverables as Partner["deliverables"],
     seminarSlotAssignments:
       raw.seminarSlotAssignments as Partner["seminarSlotAssignments"],
+    seminarSlotsConfirmedAt:
+      typeof raw.seminarSlotsConfirmedAt === "string"
+        ? raw.seminarSlotsConfirmedAt
+        : undefined,
     portalLogin:
       typeof raw.portalLogin === "string" ? raw.portalLogin : undefined,
     portalAccessEnabled: raw.portalAccessEnabled === true,
@@ -267,6 +272,67 @@ export async function loginAgainstAdmin(input: {
       error:
         "Could not reach Admin to verify partner credentials. Is Career Uttsav Admin running?",
       unreachable: true,
+    };
+  }
+}
+
+export async function fetchAdminSeminarTopics(
+  partnerId: string
+): Promise<PartnerSeminarTopicCatalog | null> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/seminar-topics`,
+      { cache: "no-store", headers: partnerServiceHeaders() }
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PartnerSeminarTopicCatalog;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveAdminSeminarTopics(
+  partnerId: string,
+  body: {
+    topics: Array<{ eventId: string; seminarId: string }>;
+    confirm: boolean;
+  }
+): Promise<
+  | { ok: true; catalog: PartnerSeminarTopicCatalog }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/seminar-topics`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (PartnerSeminarTopicCatalog & { error?: string })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error || "Could not save seminar topics.",
+      };
+    }
+    if (!payload || !Array.isArray(payload.events)) {
+      return { ok: false, status: 502, error: "Could not save seminar topics." };
+    }
+    return { ok: true, catalog: payload };
+  } catch {
+    return {
+      ok: false,
+      status: 503,
+      error: "Could not save seminar topics. Please try again.",
     };
   }
 }

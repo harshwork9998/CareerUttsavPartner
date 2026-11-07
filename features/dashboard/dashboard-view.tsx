@@ -13,11 +13,13 @@ import { RepresentativesSection } from "@/features/dashboard/representatives-sec
 import { SubmissionsSection } from "@/features/dashboard/submissions-section";
 import { PasswordModal } from "@/features/dashboard/password-modal";
 import { readFileAsDataUrl } from "@/lib/utils";
+import type { PartnerSeminarTopicCatalog } from "@/lib/seminar-topics";
 import type { EventPackageSummary, Partner } from "@/lib/types";
 
 type DashboardPayload = {
   partner: Partner;
   packages: EventPackageSummary[];
+  seminarTopics?: PartnerSeminarTopicCatalog | null;
   mustChangePassword: boolean;
   uploadStatus?: ReturnType<
     typeof import("@/lib/partner-portal-docs").getPartnerPortalUploadStatus
@@ -162,7 +164,7 @@ export function DashboardView() {
     );
   }
 
-  const { partner, packages, uploadStatus } = data;
+  const { partner, packages, seminarTopics, uploadStatus } = data;
   if (!uploadStatus) return null;
   const logoDoc = partner.portalDocuments?.find((d) => d.kind === "logo");
 
@@ -255,7 +257,31 @@ export function DashboardView() {
         >
           <div className="min-w-0 space-y-6">
             <PackageSection packages={packages} />
-            <SeminarSection packages={packages} />
+            <SeminarSection
+              packages={packages}
+              catalog={seminarTopics ?? null}
+              saving={patchMutation.isPending}
+              onRefresh={refresh}
+              onSaveTopics={async (topics, confirm) => {
+                const res = await fetch("/api/partner", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "seminar_topics",
+                    topics,
+                    confirm,
+                  }),
+                  credentials: "same-origin",
+                });
+                const payload = (await res.json().catch(() => null)) as {
+                  error?: string;
+                } | null;
+                refresh();
+                if (!res.ok) {
+                  throw new Error(payload?.error ?? "Could not save topics.");
+                }
+              }}
+            />
             <RepresentativesSection
               partner={partner}
               packages={packages}

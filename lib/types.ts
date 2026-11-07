@@ -97,6 +97,8 @@ export interface Partner {
   eventPartnerships?: PartnerEventPartnership[];
   deliverables?: PartnerDeliverable[];
   seminarSlotAssignments?: PartnerSeminarSlotAssignment[];
+  /** Set when seminar topics are confirmed. */
+  seminarSlotsConfirmedAt?: string;
   portalLogin?: string;
   /** From Admin API — password exists but the secret is never returned. */
   hasPortalPassword?: boolean;
