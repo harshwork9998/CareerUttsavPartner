@@ -10,8 +10,6 @@ export type SeminarTopicChoice = {
   hall: number | null;
   selected: boolean;
   locked: boolean;
-  slots: number;
-  remainingCapacity: number;
 };
 
 export type SeminarTopicEventGroup = {
