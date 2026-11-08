@@ -59,8 +59,13 @@ describe("advertisement creative upload", () => {
     expect(adminApi).not.toContain("SUPABASE_SECRET_KEY");
     expect(adminApi).not.toContain("sb_secret");
     const upload = readFileSync(join(process.cwd(), "lib/ad-creative-upload.ts"), "utf8");
-    expect(upload).toContain("endpoint: input.intent.tusEndpoint");
-    expect(upload).toContain("buildSupabaseStorageTusHeaders");
+    expect(upload).toContain("tusUploadToPortalStorage");
+    const shared = readFileSync(
+      join(process.cwd(), "lib/portal-storage-upload.ts"),
+      "utf8"
+    );
+    expect(shared).toContain("endpoint: input.intent.tusEndpoint");
+    expect(shared).toContain("buildSupabaseStorageTusHeaders");
     expect(upload).not.toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY");
     expect(upload).not.toMatch(/Bearer \$\{publishableKey\}/);
   });

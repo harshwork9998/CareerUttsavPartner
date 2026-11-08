@@ -4,27 +4,39 @@ import { useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { findSubmittedPortalDocument } from "@/lib/partner-portal-document";
+import { uploadPortalDocumentWithStorage } from "@/lib/portal-storage-upload";
+import { usePortalDocumentUrl } from "@/lib/use-portal-media-url";
+import {
+  formatUploadBytes,
+  PORTAL_UPLOAD_ACCEPT,
+  UPLOAD_INTERRUPTED_MESSAGE,
+  validateUploadFile,
+} from "@/lib/upload-policy";
 import type { EventPackageSummary, Partner } from "@/lib/types";
-import { PORTAL_UPLOAD_ACCEPT, validateUploadFile } from "@/lib/upload-policy";
 
 export function HeroSection({
   partner,
   packages,
-  logoUrl,
-  onLogoUpload,
+  onCommitted,
   onLogoRemove,
-  saving,
 }: {
   partner: Partner;
   packages: EventPackageSummary[];
-  logoUrl?: string;
-  onLogoUpload: (file: File) => Promise<void>;
+  onCommitted: () => void;
   onLogoRemove: () => Promise<void>;
-  saving: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<"idle" | "uploading" | "saving">("idle");
+  const [retryHint, setRetryHint] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+
+  const logoDoc = findSubmittedPortalDocument(partner.portalDocuments, "logo");
+  const logoUrl = usePortalDocumentUrl("logo", logoDoc);
 
   const firstName = partner.name.split(" ")[0] || partner.name;
   const eventPartnerships =
@@ -45,17 +57,40 @@ export function HeroSection({
         ];
 
   const handleFile = async (file?: File) => {
-    if (!file) return;
+    if (!file || uploading) return;
     const error = validateUploadFile({
       fileName: file.name,
       fileSizeBytes: file.size,
+      mimeType: file.type,
     });
     if (error) {
       setUploadError(error);
       return;
     }
     setUploadError(null);
-    await onLogoUpload(file);
+    setSelectedName(`${file.name} · ${formatUploadBytes(file.size)}`);
+    setUploading(true);
+    setProgress(0);
+    setStage("uploading");
+    setRetryHint(null);
+    const result = await uploadPortalDocumentWithStorage({
+      kind: "logo",
+      file,
+      label: "University logo",
+      onProgress: (percent) => {
+        setProgress(percent);
+        if (percent >= 100) setStage("saving");
+      },
+      onRetry: () => setRetryHint(UPLOAD_INTERRUPTED_MESSAGE),
+    });
+    setUploading(false);
+    if (!result.ok) {
+      setUploadError(result.error);
+      return;
+    }
+    setSelectedName(null);
+    setStage("idle");
+    onCommitted();
   };
 
   return (
@@ -103,7 +138,7 @@ export function HeroSection({
             <div className="group relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[28px] border border-line bg-paper shadow-[0_18px_40px_rgba(20,18,26,0.08)] transition hover:border-cu-red/40">
               <button
                 type="button"
-                disabled={saving}
+                disabled={uploading}
                 onClick={() => void onLogoRemove()}
                 aria-label="Remove logo"
                 className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-ink/80 text-white opacity-0 transition hover:bg-cu-red group-hover:opacity-100 disabled:opacity-50"
@@ -112,7 +147,7 @@ export function HeroSection({
               </button>
               <button
                 type="button"
-                disabled={saving}
+                disabled={uploading}
                 onClick={() => inputRef.current?.click()}
                 className="absolute inset-0 flex items-center justify-center"
               >
@@ -133,6 +168,26 @@ export function HeroSection({
                   Edit
                 </span>
               </button>
+              {uploading ? (
+                <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-ink/80 p-3 text-white">
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span>{stage === "saving" ? "Verifying…" : "Uploading…"}</span>
+                    <span className="tabular-nums">{progress}%</span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20">
+                    <div
+                      className="h-full rounded-full bg-white transition-[width] duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  {selectedName ? (
+                    <p className="mt-1 truncate text-[11px] text-white/80">{selectedName}</p>
+                  ) : null}
+                  {retryHint ? (
+                    <p className="mt-1 text-[11px] text-white/80">{retryHint}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="cu-panel !p-6 sm:!p-7">
@@ -146,7 +201,7 @@ export function HeroSection({
 
               <button
                 type="button"
-                disabled={saving}
+                disabled={uploading}
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -171,15 +226,37 @@ export function HeroSection({
                   className="hidden"
                   onChange={(e) => void handleFile(e.target.files?.[0])}
                 />
-                <span className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-cu-red-soft text-cu-red">
-                  <ImagePlus className="h-7 w-7" />
-                </span>
-                <p className="font-display text-lg font-bold text-ink">
-                  Add your logo
-                </p>
-                <p className="mt-1 max-w-[20ch] text-center text-xs leading-relaxed text-ink-muted">
-                  Drop a file here or click to upload
-                </p>
+                {uploading ? (
+                  <div className="w-full max-w-[240px] px-4">
+                    <p className="text-sm font-bold text-ink">
+                      {stage === "saving" ? "Verifying…" : "Uploading…"} {progress}%
+                    </p>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink/10">
+                      <div
+                        className="h-full rounded-full bg-cu-red transition-[width] duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    {selectedName ? (
+                      <p className="mt-2 text-xs text-ink-muted">{selectedName}</p>
+                    ) : null}
+                    {retryHint ? (
+                      <p className="mt-1 text-xs text-ink-muted">{retryHint}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <>
+                    <span className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-cu-red-soft text-cu-red">
+                      <ImagePlus className="h-7 w-7" />
+                    </span>
+                    <p className="font-display text-lg font-bold text-ink">
+                      Add your logo
+                    </p>
+                    <p className="mt-1 max-w-[20ch] text-center text-xs leading-relaxed text-ink-muted">
+                      Drop a file here or click to upload
+                    </p>
+                  </>
+                )}
               </button>
               {uploadError ? (
                 <p className="mt-2 text-xs font-semibold text-cu-red">

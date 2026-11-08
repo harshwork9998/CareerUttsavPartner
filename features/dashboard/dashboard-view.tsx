@@ -15,7 +15,6 @@ import {
 } from "@/features/dashboard/representatives-section";
 import { SubmissionsSection } from "@/features/dashboard/submissions-section";
 import { PasswordModal } from "@/features/dashboard/password-modal";
-import { readFileAsDataUrl } from "@/lib/utils";
 import type { PartnerSeminarTopicCatalog } from "@/lib/seminar-topics";
 import type { EventPackageSummary, Partner } from "@/lib/types";
 
@@ -189,7 +188,6 @@ export function DashboardView() {
 
   const { partner, packages, seminarTopics, uploadStatus } = data;
   if (!uploadStatus) return null;
-  const logoDoc = partner.portalDocuments?.find((d) => d.kind === "logo");
 
   return (
     <>
@@ -250,26 +248,13 @@ export function DashboardView() {
         <HeroSection
           partner={partner}
           packages={packages}
-          logoUrl={logoDoc?.url}
-          onLogoUpload={async (file) => {
-            const url = await readFileAsDataUrl(file);
-            await patchMutation.mutateAsync({
-              action: "upload_document",
-              kind: "logo",
-              label: "University logo",
-              fileName: file.name,
-              mimeType: file.type,
-              url,
-              fileSizeBytes: file.size,
-            });
-          }}
+          onCommitted={refresh}
           onLogoRemove={async () => {
             await patchMutation.mutateAsync({
               action: "remove_document",
               kind: "logo",
             });
           }}
-          saving={patchMutation.isPending}
         />
 
         <motion.div
@@ -335,19 +320,7 @@ export function DashboardView() {
                   value,
                 });
               }}
-              onUploadFile={async (kind, label, file) => {
-                if (kind === "ad_creative") return;
-                const url = await readFileAsDataUrl(file);
-                await patchMutation.mutateAsync({
-                  action: "upload_document",
-                  kind,
-                  label,
-                  fileName: file.name,
-                  mimeType: file.type,
-                  url,
-                  fileSizeBytes: file.size,
-                });
-              }}
+              onStorageCommitted={() => refresh()}
               onAdCreativeCommitted={() => refresh()}
               onSaveSpeakers={async (eventId, seminarId, speakers) => {
                 await patchMutation.mutateAsync({

@@ -56,14 +56,22 @@ export interface PartnerPortalDocument {
 }
 
 export interface PartnerSeminarSpeakerDetail {
+  /** Stable portal speaker id (UUID). Optional on legacy rows. */
+  id?: string;
   name: string;
   designation?: string;
   contact?: string;
   introduction?: string;
   /** Optional LinkedIn profile URL. */
   linkedinProfile?: string;
-  /** Data URL or hosted URL for the speaker headshot. */
+  /** Legacy headshot data URL or hosted URL. Empty for Storage-backed photos. */
   photoUrl?: string;
+  photoStorageProvider?: "supabase";
+  photoStorageBucket?: string;
+  photoStoragePath?: string;
+  photoFileName?: string;
+  photoMimeType?: string;
+  photoFileSizeBytes?: number;
   phone?: string;
   email?: string;
 }

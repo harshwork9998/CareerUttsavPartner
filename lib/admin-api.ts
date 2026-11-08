@@ -464,6 +464,267 @@ export async function commitAdminAdCreativeUpload(
   }
 }
 
+export async function fetchAdminPortalDocumentUploadIntent(
+  partnerId: string,
+  kind: "logo" | "souvenir_writeup",
+  body: {
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+  }
+): Promise<
+  | { ok: true; intent: AdCreativeUploadIntentDto }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/portal-documents/${encodeURIComponent(kind)}/upload-intent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (AdCreativeUploadIntentDto & { error?: string })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not start upload.",
+      };
+    }
+    if (!payload?.bucket || !payload.path || !payload.token || !payload.tusEndpoint) {
+      return { ok: false, status: 502, error: "Could not start upload." };
+    }
+    return { ok: true, intent: payload };
+  } catch {
+    return { ok: false, status: 503, error: "Could not start upload." };
+  }
+}
+
+export async function commitAdminPortalDocumentUpload(
+  partnerId: string,
+  kind: "logo" | "souvenir_writeup",
+  body: {
+    label: string;
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    storageBucket: string;
+    storagePath: string;
+  }
+): Promise<
+  | { ok: true; partner: Partner }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/portal-documents/${encodeURIComponent(kind)}/commit`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (Record<string, unknown> & { error?: string })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not save upload.",
+      };
+    }
+    const partner = mapAdminPartnerToPortal(payload ?? {});
+    if (!partner) {
+      return { ok: false, status: 502, error: "Could not save upload." };
+    }
+    return { ok: true, partner };
+  } catch {
+    return { ok: false, status: 503, error: "Could not save upload." };
+  }
+}
+
+export async function fetchAdminSpeakerPhotoUploadIntent(
+  partnerId: string,
+  body: {
+    eventId: string;
+    seminarId: string;
+    speakerId?: string;
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+  }
+): Promise<
+  | { ok: true; intent: AdCreativeUploadIntentDto & { speakerId: string } }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/speaker-photo/upload-intent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (AdCreativeUploadIntentDto & { speakerId?: string; error?: string })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not start upload.",
+      };
+    }
+    if (
+      !payload?.bucket ||
+      !payload.path ||
+      !payload.token ||
+      !payload.tusEndpoint ||
+      !payload.speakerId
+    ) {
+      return { ok: false, status: 502, error: "Could not start upload." };
+    }
+    return { ok: true, intent: { ...payload, speakerId: payload.speakerId } };
+  } catch {
+    return { ok: false, status: 503, error: "Could not start upload." };
+  }
+}
+
+export async function commitAdminSpeakerPhotoUpload(
+  partnerId: string,
+  body: {
+    eventId: string;
+    seminarId: string;
+    speakerId: string;
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    storageBucket: string;
+    storagePath: string;
+  }
+): Promise<
+  | {
+      ok: true;
+      partner: Partner;
+      persisted: boolean;
+      speakerId: string;
+      storageBucket: string;
+      storagePath: string;
+      mimeType: string;
+      fileSizeBytes: number;
+      fileName: string;
+    }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/speaker-photo/commit`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (Record<string, unknown> & {
+          error?: string;
+          persisted?: boolean;
+          speakerId?: string;
+          storageBucket?: string;
+          storagePath?: string;
+          mimeType?: string;
+          fileSizeBytes?: number;
+          fileName?: string;
+        })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not save upload.",
+      };
+    }
+    const partner = mapAdminPartnerToPortal(payload ?? {});
+    if (
+      !payload?.speakerId ||
+      !payload.storageBucket ||
+      !payload.storagePath
+    ) {
+      return { ok: false, status: 502, error: "Could not save upload." };
+    }
+    return {
+      ok: true,
+      partner: partner ?? ({ id: partnerId } as Partner),
+      persisted: payload.persisted === true,
+      speakerId: payload.speakerId,
+      storageBucket: payload.storageBucket,
+      storagePath: payload.storagePath,
+      mimeType: payload.mimeType || body.mimeType,
+      fileSizeBytes: Number(payload.fileSizeBytes) || body.fileSizeBytes,
+      fileName: payload.fileName || body.fileName,
+    };
+  } catch {
+    return { ok: false, status: 503, error: "Could not save upload." };
+  }
+}
+
+export async function fetchAdminSpeakerPhotoAccessUrl(
+  partnerId: string,
+  query: { eventId: string; seminarId: string; speakerId: string }
+): Promise<
+  | { ok: true; url: string }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const params = new URLSearchParams(query);
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/speaker-photo/access-url?${params}`,
+      {
+        cache: "no-store",
+        headers: partnerServiceHeaders(),
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | { url?: string; error?: string }
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not open file.",
+      };
+    }
+    if (!payload?.url) {
+      return { ok: false, status: 502, error: "Could not open file." };
+    }
+    return { ok: true, url: payload.url };
+  } catch {
+    return { ok: false, status: 503, error: "Could not open file." };
+  }
+}
+
 export async function fetchAdminPortalDocumentAccessUrl(
   partnerId: string,
   kind: string

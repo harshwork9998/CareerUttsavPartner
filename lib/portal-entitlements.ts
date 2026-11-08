@@ -1,5 +1,6 @@
 import { isValidIndianMobile } from "@/lib/phone";
 import { isSubmittedPortalDocument } from "@/lib/partner-portal-document";
+import { speakerHasPersistedPhoto } from "@/lib/partner-portal-speaker";
 import type {
   PartnerDeliverable,
   PartnerPortalDocument,
@@ -106,7 +107,7 @@ export function isPartnerSpeakerComplete(
     speaker.name?.trim() &&
       speaker.designation?.trim() &&
       speaker.introduction?.trim() &&
-      speaker.photoUrl?.trim() &&
+      speakerHasPersistedPhoto(speaker) &&
       isValidIndianMobile(contact)
   );
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   changeAdminPartnerPassword,
@@ -29,6 +30,11 @@ import { validateSmsContent } from "@/lib/sms-content";
 import { partnerSeminarSpeakerTargetError } from "@/lib/seminar-speaker-guard";
 import { seminarTopicActorId } from "@/lib/seminar-topics";
 import type { PartnerPortalDocument } from "@/lib/types";
+import {
+  isStorageBackedSpeakerPhoto,
+  speakerHasPersistedPhoto,
+} from "@/lib/partner-portal-speaker";
+import type { PartnerSeminarSpeakerDetail } from "@/lib/types";
 import {
   validateStoredUpload,
 } from "@/lib/upload-policy";
@@ -193,6 +199,12 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
+    if (body.kind === "logo" || body.kind === "souvenir_writeup") {
+      return NextResponse.json(
+        { error: "Use the storage uploader." },
+        { status: 400 }
+      );
+    }
     const fileName = String(body.fileName ?? "");
     const fileSizeBytes = Number(body.fileSizeBytes) || 0;
     const url = String(body.url ?? "");
@@ -241,32 +253,55 @@ export async function PATCH(request: Request) {
   }
 
   if (body.action === "seminar_speakers") {
-    const speakers: Array<{
-      name: string;
-      designation: string;
-      contact: string;
-      introduction: string;
-      photoUrl: string;
-      linkedinProfile: string;
-      linkedInOk: boolean;
-      linkedInError: string;
-    }> = (Array.isArray(body.speakers) ? body.speakers : []).map(
-      (s: {
-        name?: string;
-        designation?: string;
-        contact?: string;
-        introduction?: string;
-        photoUrl?: string;
-        linkedinProfile?: string;
-      }) => {
+    const eventId = String(body.eventId ?? "");
+    const seminarId = String(body.seminarId ?? "");
+    const existingRow = (partner.portalSeminarSpeakers ?? []).find(
+      (row) => row.eventId === eventId && row.seminarId === seminarId
+    );
+    const existingById = new Map(
+      (existingRow?.speakers ?? [])
+        .filter((speaker) => speaker.id?.trim())
+        .map((speaker) => [speaker.id!.trim(), speaker])
+    );
+
+    const speakers: Array<
+      PartnerSeminarSpeakerDetail & {
+        linkedInOk: boolean;
+        linkedInError: string;
+      }
+    > = (Array.isArray(body.speakers) ? body.speakers : []).map(
+      (s: PartnerSeminarSpeakerDetail) => {
         const linkedIn = validateLinkedInProfile(s.linkedinProfile);
-        return {
+        const requestedId = String(s.id ?? "").trim();
+        const prior = requestedId ? existingById.get(requestedId) : undefined;
+        const incomingUrl = String(s.photoUrl ?? "").trim();
+        const photoUrl = incomingUrl.startsWith("blob:") ? "" : incomingUrl;
+        const next: PartnerSeminarSpeakerDetail = {
+          id: requestedId || prior?.id || randomUUID(),
           name: String(s.name ?? "").trim(),
           designation: String(s.designation ?? "").trim(),
           contact: normalizeIndianMobile(String(s.contact ?? "")),
           introduction: String(s.introduction ?? "").trim(),
-          photoUrl: String(s.photoUrl ?? "").trim(),
+          photoUrl,
+          photoStorageProvider: s.photoStorageProvider,
+          photoStorageBucket: String(s.photoStorageBucket ?? "").trim() || undefined,
+          photoStoragePath: String(s.photoStoragePath ?? "").trim() || undefined,
+          photoFileName: s.photoFileName,
+          photoMimeType: s.photoMimeType,
+          photoFileSizeBytes: s.photoFileSizeBytes,
           linkedinProfile: linkedIn.ok ? linkedIn.value : String(s.linkedinProfile ?? ""),
+        };
+        if (!speakerHasPersistedPhoto(next) && prior && speakerHasPersistedPhoto(prior)) {
+          next.photoUrl = prior.photoUrl;
+          next.photoStorageProvider = prior.photoStorageProvider;
+          next.photoStorageBucket = prior.photoStorageBucket;
+          next.photoStoragePath = prior.photoStoragePath;
+          next.photoFileName = prior.photoFileName;
+          next.photoMimeType = prior.photoMimeType;
+          next.photoFileSizeBytes = prior.photoFileSizeBytes;
+        }
+        return {
+          ...next,
           linkedInOk: linkedIn.ok,
           linkedInError: linkedIn.ok ? "" : linkedIn.error,
         };
@@ -282,15 +317,15 @@ export async function PATCH(request: Request) {
     }
 
     const photoError = speakers
-      .map((speaker) =>
-        speaker.photoUrl
-          ? validateStoredUpload({
-              fileName: "speaker-photo.png",
-              fileSizeBytes: 0,
-              url: speaker.photoUrl,
-            })
-          : null
-      )
+      .map((speaker) => {
+        const url = speaker.photoUrl?.trim() ?? "";
+        if (!url.startsWith("data:")) return null;
+        return validateStoredUpload({
+          fileName: speaker.photoFileName || "speaker-photo.png",
+          fileSizeBytes: speaker.photoFileSizeBytes || 1,
+          url,
+        });
+      })
       .find((error) => error);
     if (photoError) {
       return NextResponse.json({ error: photoError }, { status: 400 });
@@ -299,8 +334,8 @@ export async function PATCH(request: Request) {
     const speakerTargetError = partnerSeminarSpeakerTargetError({
       partner,
       events: getEvents(),
-      eventId: String(body.eventId ?? ""),
-      seminarId: String(body.seminarId ?? ""),
+      eventId,
+      seminarId,
     });
     if (speakerTargetError) {
       return NextResponse.json({ error: speakerTargetError }, { status: 400 });
@@ -309,12 +344,12 @@ export async function PATCH(request: Request) {
     if (
       speakers.length === 0 ||
       speakers.some(
-        (s: { name: string; designation: string; contact: string; introduction: string; photoUrl: string }) =>
+        (s) =>
           !s.name ||
           !s.designation ||
-          !isValidIndianMobile(s.contact) ||
+          !isValidIndianMobile(s.contact ?? "") ||
           !s.introduction ||
-          !s.photoUrl
+          !speakerHasPersistedPhoto(s)
       )
     ) {
       return NextResponse.json(
@@ -326,15 +361,22 @@ export async function PATCH(request: Request) {
     return persistSubmission(partner.id, {
       op: "upsert_speakers",
       row: {
-        eventId: String(body.eventId ?? ""),
-        seminarId: String(body.seminarId ?? ""),
+        eventId,
+        seminarId,
         updatedAt: new Date().toISOString(),
         speakers: speakers.map((speaker) => ({
+          id: speaker.id,
           name: speaker.name,
           designation: speaker.designation,
           contact: speaker.contact,
           introduction: speaker.introduction,
-          photoUrl: speaker.photoUrl,
+          photoUrl: isStorageBackedSpeakerPhoto(speaker) ? "" : speaker.photoUrl,
+          photoStorageProvider: speaker.photoStorageProvider,
+          photoStorageBucket: speaker.photoStorageBucket,
+          photoStoragePath: speaker.photoStoragePath,
+          photoFileName: speaker.photoFileName,
+          photoMimeType: speaker.photoMimeType,
+          photoFileSizeBytes: speaker.photoFileSizeBytes,
           linkedinProfile: speaker.linkedinProfile || undefined,
         })),
       },

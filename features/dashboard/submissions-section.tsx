@@ -3,26 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Check,
-  Download,
-  FileUp,
   ImagePlus,
   Link2,
   MessageSquare,
   Mic2,
   Type,
-  Upload,
   X,
 } from "lucide-react";
 
 import { AdCreativeUploadCard } from "@/features/dashboard/ad-creative-upload-card";
+import { PortalStorageUploadCard } from "@/features/dashboard/portal-storage-upload-card";
 import { findSubmittedPortalDocument } from "@/lib/partner-portal-document";
 import { submissionItemsForPartner } from "@/lib/partner-portal-docs";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
+import { speakerHasPersistedPhoto } from "@/lib/partner-portal-speaker";
+import { uploadSpeakerPhotoWithStorage } from "@/lib/portal-storage-upload";
 import { SMS_CONTENT_MAX_LENGTH } from "@/lib/sms-content";
-import { PORTAL_UPLOAD_ACCEPT, validateUploadFile } from "@/lib/upload-policy";
+import {
+  PORTAL_UPLOAD_ACCEPT,
+  UPLOAD_INTERRUPTED_MESSAGE,
+  validateUploadFile,
+} from "@/lib/upload-policy";
 import { validateLinkedInProfile } from "@/lib/linkedin-profile";
 import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
-import { readFileAsDataUrl } from "@/lib/utils";
+import { useSpeakerPhotoUrl } from "@/lib/use-portal-media-url";
 import type {
   EventPackageSummary,
   Partner,
@@ -36,9 +40,9 @@ export function SubmissionsSection({
   uploadStatus,
   saving,
   onSaveText,
-  onUploadFile,
   onSaveSpeakers,
   onAdCreativeCommitted,
+  onStorageCommitted,
 }: {
   partner: Partner;
   packages: EventPackageSummary[];
@@ -53,17 +57,13 @@ export function SubmissionsSection({
     field: "portalFasciaName" | "portalWebsiteUrl" | "portalSmsContent",
     value: string
   ) => Promise<void>;
-  onUploadFile: (
-    kind: "souvenir_writeup" | "ad_creative",
-    label: string,
-    file: File
-  ) => Promise<void>;
   onSaveSpeakers: (
     eventId: string,
     seminarId: string,
     speakers: PartnerSeminarSpeakerDetail[]
   ) => Promise<void>;
   onAdCreativeCommitted: () => void;
+  onStorageCommitted: () => void;
 }) {
   const seminars = packages.flatMap((pkg) =>
     pkg.seminars.map((s) => ({
@@ -162,20 +162,22 @@ export function SubmissionsSection({
               );
             }
             return (
-              <FileUploadCard
+              <PortalStorageUploadCard
                 key={item.key}
+                kind="souvenir_writeup"
                 label={item.label}
+                doc={doc}
                 accept={item.accept}
-                done={Boolean(doc)}
-                fileName={doc?.fileName}
+                helperText={
+                  "templateUrl" in item && item.templateUrl
+                    ? "Download the format below, fill it in, then upload here"
+                    : "Click or drag a file here"
+                }
                 templateUrl={"templateUrl" in item ? item.templateUrl : undefined}
                 templateLabel={
                   "templateLabel" in item ? item.templateLabel : undefined
                 }
-                saving={saving}
-                onUpload={(file) =>
-                  onUploadFile(item.docKind, item.label, file)
-                }
+                onCommitted={onStorageCommitted}
               />
             );
           }
@@ -197,6 +199,8 @@ export function SubmissionsSection({
                   return (
                     <SpeakerCard
                       key={seminar.id}
+                      eventId={seminar.eventId}
+                      seminarId={seminar.id}
                       seminarTitle={seminar.title}
                       eventTitle={seminar.eventTitle}
                       seats={seminar.slots}
@@ -349,92 +353,9 @@ function TextAreaCard({
   );
 }
 
-function FileUploadCard({
-  label,
-  accept,
-  done,
-  fileName,
-  templateUrl,
-  templateLabel,
-  saving,
-  onUpload,
-}: {
-  label: string;
-  accept: string;
-  done: boolean;
-  fileName?: string;
-  templateUrl?: string;
-  templateLabel?: string;
-  saving: boolean;
-  onUpload: (file: File) => Promise<void>;
-}) {
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  return (
-    <div
-      className={`rounded-2xl border-2 border-dashed px-4 py-4 transition ${
-        done
-          ? "border-cu-green/35 bg-cu-green-soft/30"
-          : "border-line-strong bg-paper"
-      }`}
-    >
-      <label className="flex cursor-pointer items-start gap-3 transition hover:opacity-95">
-        <input
-          type="file"
-          accept={accept}
-          className="hidden"
-          disabled={saving}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file) return;
-            const error = validateUploadFile({
-              fileName: file.name,
-              fileSizeBytes: file.size,
-            });
-            if (error) {
-              setUploadError(error);
-              return;
-            }
-            setUploadError(null);
-            void onUpload(file);
-          }}
-        />
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-cu-red shadow-sm">
-          {done ? <FileUp className="h-5 w-5" /> : <Upload className="h-5 w-5" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-ink">{label}</p>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {done && fileName
-              ? `Uploaded · ${fileName}`
-              : templateUrl
-                ? "Download the format below, fill it in, then upload here"
-                : "Click or drop a file to upload"}
-          </p>
-        </div>
-        {done ? (
-          <Check className="h-4 w-4 shrink-0 text-cu-green" strokeWidth={3} />
-        ) : null}
-      </label>
-      {templateUrl ? (
-        <a
-          href={templateUrl}
-          download="Career-Uttsav-Souvenir-Write-Up-Format.docx"
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-cu-blue transition hover:text-cu-blue-dark"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Download className="h-3.5 w-3.5" />
-          {templateLabel ?? "Download format"}
-        </a>
-      ) : null}
-      {uploadError ? (
-        <p className="mt-2 text-xs font-semibold text-cu-red">{uploadError}</p>
-      ) : null}
-    </div>
-  );
-}
-
 function SpeakerCard({
+  eventId,
+  seminarId,
   seminarTitle,
   eventTitle,
   seats,
@@ -442,6 +363,8 @@ function SpeakerCard({
   saving,
   onSave,
 }: {
+  eventId: string;
+  seminarId: string;
   seminarTitle: string;
   eventTitle: string;
   seats: number;
@@ -452,6 +375,7 @@ function SpeakerCard({
   const normalizeSpeaker = (
     s: PartnerSeminarSpeakerDetail
   ): PartnerSeminarSpeakerDetail => ({
+    id: s.id,
     name: s.name ?? "",
     designation: s.designation ?? "",
     contact: normalizeIndianMobile(
@@ -459,6 +383,12 @@ function SpeakerCard({
     ),
     introduction: s.introduction ?? "",
     photoUrl: s.photoUrl ?? "",
+    photoStorageProvider: s.photoStorageProvider,
+    photoStorageBucket: s.photoStorageBucket,
+    photoStoragePath: s.photoStoragePath,
+    photoFileName: s.photoFileName,
+    photoMimeType: s.photoMimeType,
+    photoFileSizeBytes: s.photoFileSizeBytes,
     linkedinProfile: s.linkedinProfile ?? "",
   });
 
@@ -498,7 +428,7 @@ function SpeakerCard({
         s.designation?.trim() &&
         isValidIndianMobile(s.contact ?? "") &&
         s.introduction?.trim() &&
-        s.photoUrl?.trim()
+        speakerHasPersistedPhoto(s)
     );
 
   const savedDone = initialSpeakers.some(speakerComplete);
@@ -522,19 +452,51 @@ function SpeakerCard({
     );
   };
 
+  const [photoUploading, setPhotoUploading] = useState<number | null>(null);
+  const [photoProgress, setPhotoProgress] = useState(0);
+  const [localPreviews, setLocalPreviews] = useState<Record<number, string>>({});
+
   const handlePhoto = async (index: number, file?: File) => {
-    if (!file) return;
+    if (!file || photoUploading !== null) return;
     const error = validateUploadFile({
       fileName: file.name,
       fileSizeBytes: file.size,
+      mimeType: file.type,
     });
     if (error) {
       setFormError(error);
       return;
     }
     setFormError(null);
-    const photoUrl = await readFileAsDataUrl(file);
-    patchSpeaker(index, { photoUrl });
+    const preview = URL.createObjectURL(file);
+    setLocalPreviews((prev) => ({ ...prev, [index]: preview }));
+    setDraftLocked(true);
+    setPhotoUploading(index);
+    setPhotoProgress(0);
+    const current = speakers[index];
+    const result = await uploadSpeakerPhotoWithStorage({
+      file,
+      eventId,
+      seminarId,
+      speakerId: current?.id,
+      onProgress: setPhotoProgress,
+      onRetry: () => setFormError(UPLOAD_INTERRUPTED_MESSAGE),
+    });
+    setPhotoUploading(null);
+    if (!result.ok) {
+      setFormError(result.error);
+      return;
+    }
+    patchSpeaker(index, {
+      id: result.speakerId,
+      photoUrl: "",
+      photoStorageProvider: "supabase",
+      photoStorageBucket: result.storageBucket,
+      photoStoragePath: result.storagePath,
+      photoFileName: result.fileName,
+      photoMimeType: result.mimeType,
+      photoFileSizeBytes: result.fileSizeBytes,
+    });
   };
 
   return (
@@ -567,11 +529,31 @@ function SpeakerCard({
             </p>
 
             <SpeakerPhotoField
-              photoUrl={speaker.photoUrl}
+              speaker={speaker}
+              eventId={eventId}
+              seminarId={seminarId}
+              localPreview={localPreviews[i]}
               name={speaker.name}
-              disabled={saving}
+              disabled={saving || photoUploading !== null}
+              uploading={photoUploading === i}
+              progress={photoUploading === i ? photoProgress : 0}
               onUpload={(file) => void handlePhoto(i, file)}
-              onRemove={() => patchSpeaker(i, { photoUrl: "" })}
+              onRemove={() => {
+                setLocalPreviews((prev) => {
+                  const next = { ...prev };
+                  delete next[i];
+                  return next;
+                });
+                patchSpeaker(i, {
+                  photoUrl: "",
+                  photoStorageProvider: undefined,
+                  photoStorageBucket: undefined,
+                  photoStoragePath: undefined,
+                  photoFileName: undefined,
+                  photoMimeType: undefined,
+                  photoFileSizeBytes: undefined,
+                });
+              }}
             />
 
             <input
@@ -665,29 +647,60 @@ function SpeakerCard({
 }
 
 function SpeakerPhotoField({
-  photoUrl,
+  speaker,
+  eventId,
+  seminarId,
+  localPreview,
   name,
   disabled,
+  uploading,
+  progress,
   onUpload,
   onRemove,
 }: {
-  photoUrl?: string;
+  speaker: PartnerSeminarSpeakerDetail;
+  eventId: string;
+  seminarId: string;
+  localPreview?: string;
   name?: string;
   disabled?: boolean;
+  uploading?: boolean;
+  progress?: number;
   onUpload: (file: File) => void;
   onRemove: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const photoUrl = useSpeakerPhotoUrl(eventId, seminarId, speaker, localPreview);
+  const hasPhoto = Boolean(photoUrl) || speakerHasPersistedPhoto(speaker);
 
-  if (photoUrl) {
+  if (hasPhoto || uploading) {
     return (
       <div className="group relative mx-auto aspect-square w-28 overflow-hidden rounded-2xl border border-line bg-paper">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photoUrl}
-          alt={name ? `${name} photo` : "Speaker photo"}
-          className="h-full w-full object-cover"
-        />
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photoUrl}
+            alt={name ? `${name} photo` : "Speaker photo"}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center text-ink-muted">
+            <ImagePlus className="h-6 w-6" />
+          </div>
+        )}
+        {uploading ? (
+          <div className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5">
+            <p className="text-[10px] font-bold text-white">
+              {progress && progress >= 100 ? "Verifying…" : `Uploading… ${progress ?? 0}%`}
+            </p>
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-white transition-[width] duration-300"
+                style={{ width: `${progress ?? 0}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
         <button
           type="button"
           disabled={disabled}
@@ -697,6 +710,7 @@ function SpeakerPhotoField({
         >
           <X className="h-3.5 w-3.5" strokeWidth={2.5} />
         </button>
+        {!uploading ? (
         <button
           type="button"
           disabled={disabled}
@@ -705,6 +719,7 @@ function SpeakerPhotoField({
         >
           Edit
         </button>
+        ) : null}
         <input
           ref={inputRef}
           type="file"
