@@ -46,9 +46,13 @@ export interface PartnerPortalDocument {
   label: string;
   fileName: string;
   mimeType: string;
+  /** Legacy data URL or hosted URL. Empty for Supabase-backed uploads. */
   url: string;
   fileSizeBytes: number;
   uploadedAt: string;
+  storageProvider?: "supabase";
+  storageBucket?: string;
+  storagePath?: string;
 }
 
 export interface PartnerSeminarSpeakerDetail {

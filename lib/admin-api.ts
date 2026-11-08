@@ -367,6 +367,137 @@ export function pickPortalSyncPatch(partner: Partner): Partial<Partner> {
   };
 }
 
+export type AdCreativeUploadIntentDto = {
+  bucket: string;
+  path: string;
+  token: string;
+  tusEndpoint: string;
+};
+
+export async function fetchAdminAdCreativeUploadIntent(
+  partnerId: string,
+  body: {
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+  }
+): Promise<
+  | { ok: true; intent: AdCreativeUploadIntentDto }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/ad-creative/upload-intent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (AdCreativeUploadIntentDto & { error?: string })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not start upload.",
+      };
+    }
+    if (!payload?.bucket || !payload.path || !payload.token || !payload.tusEndpoint) {
+      return { ok: false, status: 502, error: "Could not start upload." };
+    }
+    return { ok: true, intent: payload };
+  } catch {
+    return { ok: false, status: 503, error: "Could not start upload." };
+  }
+}
+
+export async function commitAdminAdCreativeUpload(
+  partnerId: string,
+  body: {
+    label: string;
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    storageBucket: string;
+    storagePath: string;
+  }
+): Promise<
+  | { ok: true; partner: Partner }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/ad-creative/commit`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | (Record<string, unknown> & { error?: string })
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not save upload.",
+      };
+    }
+    const partner = mapAdminPartnerToPortal(payload ?? {});
+    if (!partner) {
+      return { ok: false, status: 502, error: "Could not save upload." };
+    }
+    return { ok: true, partner };
+  } catch {
+    return { ok: false, status: 503, error: "Could not save upload." };
+  }
+}
+
+export async function fetchAdminPortalDocumentAccessUrl(
+  partnerId: string,
+  kind: string
+): Promise<
+  | { ok: true; url: string }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/portal-documents/${encodeURIComponent(kind)}/access-url`,
+      {
+        cache: "no-store",
+        headers: partnerServiceHeaders(),
+      }
+    );
+    const payload = (await res.json().catch(() => null)) as
+      | { url?: string; error?: string }
+      | null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: payload?.error ?? "Could not open file.",
+      };
+    }
+    if (!payload?.url) {
+      return { ok: false, status: 502, error: "Could not open file." };
+    }
+    return { ok: true, url: payload.url };
+  } catch {
+    return { ok: false, status: 503, error: "Could not open file." };
+  }
+}
+
 export async function patchAdminPartner(
   id: string,
   patch: Partial<Partner>

@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 
+import { AdCreativeUploadCard } from "@/features/dashboard/ad-creative-upload-card";
+import { findSubmittedPortalDocument } from "@/lib/partner-portal-document";
 import { submissionItemsForPartner } from "@/lib/partner-portal-docs";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
 import { SMS_CONTENT_MAX_LENGTH } from "@/lib/sms-content";
@@ -28,16 +30,6 @@ import type {
 } from "@/lib/types";
 import { PhoneField } from "@/features/dashboard/phone-field";
 
-function findSubmissionDoc(
-  partner: Partner,
-  kind: "souvenir_writeup" | "ad_creative"
-) {
-  return partner.portalDocuments?.find(
-    (d) =>
-      d.kind === kind || (kind === "souvenir_writeup" && d.kind === "writeup")
-  );
-}
-
 export function SubmissionsSection({
   partner,
   packages,
@@ -46,6 +38,7 @@ export function SubmissionsSection({
   onSaveText,
   onUploadFile,
   onSaveSpeakers,
+  onAdCreativeCommitted,
 }: {
   partner: Partner;
   packages: EventPackageSummary[];
@@ -70,6 +63,7 @@ export function SubmissionsSection({
     seminarId: string,
     speakers: PartnerSeminarSpeakerDetail[]
   ) => Promise<void>;
+  onAdCreativeCommitted: () => void;
 }) {
   const seminars = packages.flatMap((pkg) =>
     pkg.seminars.map((s) => ({
@@ -153,7 +147,20 @@ export function SubmissionsSection({
           }
 
           if (item.type === "file") {
-            const doc = findSubmissionDoc(partner, item.docKind);
+            const doc = findSubmittedPortalDocument(
+              partner.portalDocuments,
+              item.docKind
+            );
+            if (item.docKind === "ad_creative") {
+              return (
+                <AdCreativeUploadCard
+                  key={item.key}
+                  label={item.label}
+                  doc={doc}
+                  onCommitted={onAdCreativeCommitted}
+                />
+              );
+            }
             return (
               <FileUploadCard
                 key={item.key}

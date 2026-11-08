@@ -316,6 +316,7 @@ export function DashboardView() {
                 });
               }}
               onUploadFile={async (kind, label, file) => {
+                if (kind === "ad_creative") return;
                 const url = await readFileAsDataUrl(file);
                 await patchMutation.mutateAsync({
                   action: "upload_document",
@@ -327,6 +328,7 @@ export function DashboardView() {
                   fileSizeBytes: file.size,
                 });
               }}
+              onAdCreativeCommitted={() => refresh()}
               onSaveSpeakers={async (eventId, seminarId, speakers) => {
                 await patchMutation.mutateAsync({
                   action: "seminar_speakers",

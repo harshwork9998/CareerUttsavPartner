@@ -213,7 +213,12 @@ export function upsertPartnerFromAdminAuth(input: {
 
 export function upsertPortalDocument(
   partnerId: string,
-  doc: Omit<PartnerPortalDocument, "id" | "uploadedAt"> & { id?: string }
+  doc: Omit<PartnerPortalDocument, "id" | "uploadedAt"> & {
+    id?: string;
+    storageProvider?: PartnerPortalDocument["storageProvider"];
+    storageBucket?: string;
+    storagePath?: string;
+  }
 ) {
   const partner = getPartnerById(partnerId);
   if (!partner) return null;
@@ -228,6 +233,9 @@ export function upsertPortalDocument(
     url: doc.url,
     fileSizeBytes: doc.fileSizeBytes,
     uploadedAt: new Date().toISOString(),
+    storageProvider: doc.storageProvider,
+    storageBucket: doc.storageBucket,
+    storagePath: doc.storagePath,
   };
   if (idx >= 0) docs[idx] = next;
   else docs.push(next);

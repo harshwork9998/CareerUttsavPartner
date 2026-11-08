@@ -192,6 +192,12 @@ export async function PATCH(request: Request) {
   }
 
   if (body.action === "upload_document") {
+    if (body.kind === "ad_creative") {
+      return NextResponse.json(
+        { error: "Use the advertisement creative uploader." },
+        { status: 400 }
+      );
+    }
     const fileName = String(body.fileName ?? "");
     const fileSizeBytes = Number(body.fileSizeBytes) || 0;
     const url = String(body.url ?? "");
@@ -199,6 +205,7 @@ export async function PATCH(request: Request) {
       fileName,
       fileSizeBytes,
       url,
+      kind: body.kind,
     });
     if (uploadError) {
       return NextResponse.json({ error: uploadError }, { status: 400 });
