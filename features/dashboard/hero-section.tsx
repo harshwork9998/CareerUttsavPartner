@@ -205,8 +205,9 @@ export function HeroSection({
               <button
                 type="button"
                 disabled={uploading}
+                aria-label="Replace university logo"
                 onClick={() => inputRef.current?.click()}
-                className="absolute inset-0 flex items-center justify-center"
+                className="absolute inset-0 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cu-red"
               >
                 <input
                   ref={inputRef}
@@ -235,9 +236,27 @@ export function HeroSection({
                     {logoDoc?.fileSizeBytes ? (
                       <p className="text-[11px]">{formatUploadBytes(logoDoc.fileSizeBytes)}</p>
                     ) : null}
+                    {logoDoc && !uploading ? (
+                      <button
+                        type="button"
+                        onClick={async (event) => {
+                          event.stopPropagation();
+                          if (logoDoc.url?.trim() && !isStorageBackedPortalDocument(logoDoc)) {
+                            window.open(logoDoc.url, "_blank", "noopener,noreferrer");
+                            return;
+                          }
+                          const url = await fetchPortalDocumentAccessUrl("logo");
+                          if (url) window.open(url, "_blank", "noopener,noreferrer");
+                        }}
+                        className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-[11px] font-bold text-ink"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        View / Download
+                      </button>
+                    ) : null}
                   </div>
                 )}
-                <span className="absolute bottom-3 right-3 rounded-full bg-ink/80 px-3 py-1 text-[11px] font-semibold text-white opacity-0 transition group-hover:opacity-100">
+                <span className="absolute bottom-3 right-3 rounded-full bg-ink/80 px-3 py-1 text-[11px] font-semibold text-white opacity-100 transition group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                   Replace
                 </span>
               </button>
@@ -262,32 +281,6 @@ export function HeroSection({
                 </div>
               ) : null}
             </div>
-            {logoDoc && !uploading ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (logoDoc.url?.trim() && !isStorageBackedPortalDocument(logoDoc)) {
-                      window.open(logoDoc.url, "_blank", "noopener,noreferrer");
-                      return;
-                    }
-                    const url = await fetchPortalDocumentAccessUrl("logo");
-                    if (url) window.open(url, "_blank", "noopener,noreferrer");
-                  }}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  View / Download
-                </button>
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-cu-red px-3 text-xs font-bold text-white"
-                >
-                  Replace Document
-                </button>
-              </div>
-            ) : null}
             </>
           ) : (
             <div className="cu-panel !p-6 sm:!p-7">

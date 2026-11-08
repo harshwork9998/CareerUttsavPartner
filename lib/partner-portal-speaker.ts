@@ -55,3 +55,42 @@ export function speakerPhotoStorageRef(
     storagePath: speaker.photoStoragePath!.trim(),
   };
 }
+
+export function findPortalSpeakerInPartner(
+  partner: { portalSeminarSpeakers?: Array<{ eventId: string; seminarId: string; speakers: PartnerSeminarSpeakerDetail[] }> } | null | undefined,
+  eventId: string,
+  seminarId: string,
+  speakerId?: string | null
+): PartnerSeminarSpeakerDetail | undefined {
+  const id = speakerId?.trim();
+  if (!id) return undefined;
+  const row = partner?.portalSeminarSpeakers?.find(
+    (entry) => entry.eventId === eventId && entry.seminarId === seminarId
+  );
+  return row?.speakers.find((speaker) => speaker.id === id);
+}
+
+/** Authoritative compare-and-swap token from saved partner data, not draft-only fields. */
+export function speakerPhotoIfMatchTokenForUpload(
+  partner: Parameters<typeof findPortalSpeakerInPartner>[0],
+  eventId: string,
+  seminarId: string,
+  speakerId?: string | null,
+  localFallback?: PartnerSeminarSpeakerDetail | null
+): string | undefined {
+  const fromPartner = findPortalSpeakerInPartner(partner, eventId, seminarId, speakerId);
+  const authority = fromPartner ?? localFallback;
+  if (!authority || !speakerHasPersistedPhoto(authority)) return undefined;
+  return speakerPhotoMatchToken(authority);
+}
+
+/** Prefer the token frozen when the upload started; never adopt a newer refetch at commit. */
+export function speakerPhotoCommitIfMatchToken(input: {
+  frozenAtUploadStart?: string;
+  resolveAtCommit?: () => string | undefined;
+}): string | undefined {
+  if (input.frozenAtUploadStart !== undefined) {
+    return input.frozenAtUploadStart;
+  }
+  return input.resolveAtCommit?.();
+}

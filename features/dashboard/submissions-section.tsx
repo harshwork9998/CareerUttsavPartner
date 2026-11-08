@@ -17,8 +17,9 @@ import { findSubmittedPortalDocument } from "@/lib/partner-portal-document";
 import { submissionItemsForPartner } from "@/lib/partner-portal-docs";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
 import {
+  findPortalSpeakerInPartner,
   speakerHasPersistedPhoto,
-  speakerPhotoMatchToken,
+  speakerPhotoIfMatchTokenForUpload,
 } from "@/lib/partner-portal-speaker";
 import { uploadSpeakerPhotoWithStorage } from "@/lib/portal-storage-upload";
 import { SMS_CONTENT_MAX_LENGTH } from "@/lib/sms-content";
@@ -204,6 +205,7 @@ export function SubmissionsSection({
                   return (
                     <SpeakerCard
                       key={seminar.id}
+                      partner={partner}
                       eventId={seminar.eventId}
                       seminarId={seminar.id}
                       seminarTitle={seminar.title}
@@ -360,6 +362,7 @@ function TextAreaCard({
 }
 
 function SpeakerCard({
+  partner,
   eventId,
   seminarId,
   seminarTitle,
@@ -370,6 +373,7 @@ function SpeakerCard({
   onSave,
   onPhotoCommitted,
 }: {
+  partner: Partner;
   eventId: string;
   seminarId: string;
   seminarTitle: string;
@@ -464,6 +468,45 @@ function SpeakerCard({
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
   const [photoProgress, setPhotoProgress] = useState(0);
   const [localPreviews, setLocalPreviews] = useState<Record<number, string>>({});
+  const partnerRef = useRef(partner);
+  partnerRef.current = partner;
+
+  const applyCommittedSpeakerPhoto = (
+    index: number,
+    source: Partner,
+    speakerId?: string,
+    upload?: {
+      speakerId: string;
+      storageBucket: string;
+      storagePath: string;
+      mimeType: string;
+      fileSizeBytes: number;
+      fileName: string;
+    }
+  ) => {
+    const committed = speakerId
+      ? findPortalSpeakerInPartner(source, eventId, seminarId, speakerId)
+      : undefined;
+    if (committed) {
+      patchSpeaker(index, {
+        ...normalizeSpeaker(committed),
+        id: committed.id ?? upload?.speakerId,
+      });
+      return;
+    }
+    if (!upload) return;
+    patchSpeaker(index, {
+      id: upload.speakerId,
+      photoUrl: "",
+      photoStorageProvider: "supabase",
+      photoStorageBucket: upload.storageBucket,
+      photoStoragePath: upload.storagePath,
+      photoFileName: upload.fileName,
+      photoMimeType: upload.mimeType,
+      photoFileSizeBytes: upload.fileSizeBytes,
+      photoUploadedAt: new Date().toISOString(),
+    });
+  };
 
   const handlePhoto = async (index: number, file?: File) => {
     if (!file || photoUploading !== null) return;
@@ -484,12 +527,19 @@ function SpeakerCard({
     setPhotoUploading(index);
     setPhotoProgress(0);
     const current = speakers[index];
+    const ifMatchTokenAtUploadStart = speakerPhotoIfMatchTokenForUpload(
+      partnerRef.current,
+      eventId,
+      seminarId,
+      current?.id,
+      current
+    );
     const result = await uploadSpeakerPhotoWithStorage({
       file,
       eventId,
       seminarId,
       speakerId: current?.id,
-      ifMatchToken: speakerPhotoMatchToken(current),
+      ifMatchToken: ifMatchTokenAtUploadStart,
       onProgress: setPhotoProgress,
       onRetry: () => setFormError(UPLOAD_INTERRUPTED_MESSAGE),
     });
@@ -505,35 +555,20 @@ function SpeakerCard({
       });
       if (result.partner) {
         onPhotoCommitted(result.partner);
-        const matched = result.partner.portalSeminarSpeakers
-          ?.find((row) => row.eventId === eventId && row.seminarId === seminarId)
-          ?.speakers.find((item) => item.id === current?.id);
-        if (matched) {
-          patchSpeaker(index, {
-            photoUrl: matched.photoUrl,
-            photoStorageProvider: matched.photoStorageProvider,
-            photoStorageBucket: matched.photoStorageBucket,
-            photoStoragePath: matched.photoStoragePath,
-            photoFileName: matched.photoFileName,
-            photoMimeType: matched.photoMimeType,
-            photoFileSizeBytes: matched.photoFileSizeBytes,
-            photoUploadedAt: matched.photoUploadedAt,
-          });
-        }
+        applyCommittedSpeakerPhoto(index, result.partner, current?.id);
       }
       return;
     }
+    setFormError(null);
+    const committedPartner = result.partner ?? partnerRef.current;
     if (result.partner) onPhotoCommitted(result.partner);
-    patchSpeaker(index, {
-      id: result.speakerId,
-      photoUrl: "",
-      photoStorageProvider: "supabase",
-      photoStorageBucket: result.storageBucket,
-      photoStoragePath: result.storagePath,
-      photoFileName: result.fileName,
-      photoMimeType: result.mimeType,
-      photoFileSizeBytes: result.fileSizeBytes,
-      photoUploadedAt: new Date().toISOString(),
+    applyCommittedSpeakerPhoto(index, committedPartner, result.speakerId, {
+      speakerId: result.speakerId,
+      storageBucket: result.storageBucket,
+      storagePath: result.storagePath,
+      mimeType: result.mimeType,
+      fileSizeBytes: result.fileSizeBytes,
+      fileName: result.fileName,
     });
   };
 

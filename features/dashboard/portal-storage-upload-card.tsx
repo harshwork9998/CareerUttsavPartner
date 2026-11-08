@@ -137,29 +137,6 @@ export function PortalStorageUploadCard({
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }, [displayDoc, kind]);
 
-  const downloadSubmitted = useCallback(async () => {
-    if (!displayDoc) return;
-    let href = displayDoc.url?.trim() || "";
-    if (!href || isStorageBackedPortalDocument(displayDoc)) {
-      href = (await fetchPortalDocumentAccessUrl(kind)) ?? "";
-    }
-    if (!href) return;
-    try {
-      const res = await fetch(href);
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = displayDoc.fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(objectUrl);
-    } catch {
-      window.open(href, "_blank", "noopener,noreferrer");
-    }
-  }, [displayDoc, kind]);
-
   return (
     <div
       className={`rounded-2xl border-2 border-dashed px-4 py-4 transition ${
@@ -284,14 +261,6 @@ export function PortalStorageUploadCard({
           >
             <ExternalLink className="h-3.5 w-3.5" />
             View / Download
-          </button>
-          <button
-            type="button"
-            onClick={() => void downloadSubmitted()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download
           </button>
           <button
             type="button"

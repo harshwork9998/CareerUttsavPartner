@@ -9,6 +9,7 @@ import {
   validateUploadFile,
   type PortalUploadKindPolicy,
 } from "@/lib/upload-policy";
+import { speakerPhotoCommitIfMatchToken } from "@/lib/partner-portal-speaker";
 import {
   buildSupabaseStorageTusHeaders,
   readSupabasePublishableKey,
@@ -324,6 +325,7 @@ export async function uploadSpeakerPhotoWithStorage(input: {
   onProgress: (percent: number) => void;
   onRetry?: () => void;
   ifMatchToken?: string;
+  resolveIfMatchToken?: () => string | undefined;
 }): Promise<
   | {
       ok: true;
@@ -360,7 +362,10 @@ export async function uploadSpeakerPhotoWithStorage(input: {
     eventId: input.eventId,
     seminarId: input.seminarId,
     speakerId: intentResult.speakerId,
-    ifMatchToken: input.ifMatchToken,
+    ifMatchToken: speakerPhotoCommitIfMatchToken({
+      frozenAtUploadStart: input.ifMatchToken,
+      resolveAtCommit: input.resolveIfMatchToken,
+    }),
   });
 }
 

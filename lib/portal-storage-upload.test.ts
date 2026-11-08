@@ -49,6 +49,7 @@ describe("partner portal storage migration", () => {
     expect(upload).not.toContain("sb_secret");
     expect(upload).not.toContain("SUPABASE_SECRET_KEY");
     expect(upload).toContain("ifMatchToken");
+    expect(upload).toContain("speakerPhotoCommitIfMatchToken");
     expect(upload).toContain("resolvedUploadContentType");
   });
 

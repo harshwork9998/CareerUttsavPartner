@@ -335,13 +335,15 @@ describe("uploads and advertisement labels", () => {
     );
     expect(hero).toContain(`accept={PORTAL_UPLOAD_ACCEPT}`);
     expect(hero).toContain("PORTAL_DOCUMENT_FORMAT_LABEL");
-    expect(hero).toContain("Replace Document");
+    expect(hero).not.toContain("Replace Document");
+    expect(hero).toContain('aria-label="Replace university logo"');
     expect(hero).not.toContain("40 MB");
     expect(submissions).toContain("PORTAL_SPEAKER_PHOTO_ACCEPT");
     expect(submissions).toContain("Change Photo");
     expect(submissions).not.toContain("40 MB");
     expect(writeup).toContain("Replace Document");
     expect(writeup).toContain("View / Download");
+    expect(writeup).not.toMatch(/<Download className="h-3\.5 w-3\.5" \/>\s*\n\s*Download\s*\n/);
     expect(PORTAL_UPLOAD_ACCEPT).toBe(".svg,.png,.jpg,.jpeg,.pdf,.cdr,.ai,.eps");
   });
 
