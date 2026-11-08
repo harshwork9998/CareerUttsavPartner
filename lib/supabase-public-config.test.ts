@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
   buildSupabaseStorageTusHeaders,
   isLegacySupabaseJwtApiKey,
+  readSupabasePublicUrl,
   readSupabasePublishableKey,
 } from "@/lib/supabase-public-config";
 
@@ -63,6 +67,23 @@ describe("supabase publishable config", () => {
     expect(headers.apikey).toBe(jwt);
     expect(headers.authorization).toBe(`Bearer ${jwt}`);
     expect(headers["x-signature"]).toBe("signed-upload-token");
+  });
+
+  it("reads the public project URL from a static env reference", () => {
+    snapshotEnv(["NEXT_PUBLIC_SUPABASE_URL"]);
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example-ref.supabase.co";
+    expect(readSupabasePublicUrl()).toBe("https://example-ref.supabase.co");
+  });
+
+  it("does not look up public Supabase env vars dynamically", () => {
+    const source = readFileSync(
+      join(process.cwd(), "lib/supabase-public-config.ts"),
+      "utf8"
+    );
+    expect(source).toContain("process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+    expect(source).toContain("process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    expect(source).toContain("process.env.NEXT_PUBLIC_SUPABASE_URL");
+    expect(source).not.toMatch(/process\.env\[/);
   });
 
   it("falls back to NEXT_PUBLIC_SUPABASE_ANON_KEY", () => {
