@@ -3,6 +3,11 @@ import type {
   PartnerSeminarSlotAssignment,
 } from "@/lib/types";
 import { PORTAL_UPLOAD_ACCEPT } from "@/lib/upload-policy";
+import { resolveEventPartnerships } from "@/lib/partner-event-config";
+import {
+  partnerPortalSubmissionEntitlements,
+  type PortalSubmissionKey,
+} from "@/lib/portal-entitlements";
 
 export const PORTAL_SUBMISSION_ITEMS = [
   {
@@ -46,14 +51,36 @@ export const PORTAL_SUBMISSION_ITEMS = [
   },
 ] as const;
 
+export type PartnerPortalSubmissionItem =
+  (typeof PORTAL_SUBMISSION_ITEMS)[number];
+
 function findDoc(partner: Partner, kind: string) {
   return (partner.portalDocuments ?? []).find(
     (d) => d.kind === kind || (kind === "souvenir_writeup" && d.kind === "writeup")
   );
 }
 
-function allottedSeminars(assignments: PartnerSeminarSlotAssignment[] | undefined) {
-  return (assignments ?? []).filter((a) => a.slots > 0);
+export function submissionItemsForPartner(partner: Partner): PartnerPortalSubmissionItem[] {
+  const entitlements = partnerPortalSubmissionEntitlements({
+    partnerships: resolveEventPartnerships(partner).map((row) => ({
+      eventId: row.eventId,
+      deliverables: row.deliverables ?? [],
+      representativeSlotCount: row.representativeSlotCount,
+      seminarSlotCount: row.seminarSlotCount,
+    })),
+    seminarSlotAssignments: partner.seminarSlotAssignments,
+    portalFasciaName: partner.portalFasciaName,
+    portalWebsiteUrl: partner.portalWebsiteUrl,
+    portalSmsContent: partner.portalSmsContent,
+    documents: partner.portalDocuments,
+    speakers: partner.portalSeminarSpeakers,
+    representatives: partner.portalRepresentatives,
+  });
+
+  return PORTAL_SUBMISSION_ITEMS.filter((item) => {
+    const key = item.key as PortalSubmissionKey;
+    return entitlements[key]?.applicable !== false;
+  });
 }
 
 export function getPartnerPortalUploadStatus(
@@ -65,67 +92,74 @@ export function getPartnerPortalUploadStatus(
     | "portalWebsiteUrl"
     | "portalSmsContent"
     | "portalSeminarSpeakers"
+    | "portalRepresentatives"
     | "seminarSlotAssignments"
+    | "eventPartnerships"
+    | "eventIds"
+    | "deliverables"
+    | "sponsorshipTier"
   >
 ) {
+  const entitlements = partnerPortalSubmissionEntitlements({
+    partnerships: resolveEventPartnerships(partner as Partner).map((row) => ({
+      eventId: row.eventId,
+      deliverables: row.deliverables ?? [],
+      representativeSlotCount: row.representativeSlotCount,
+      seminarSlotCount: row.seminarSlotCount,
+    })),
+    seminarSlotAssignments: partner.seminarSlotAssignments,
+    portalFasciaName: partner.portalFasciaName,
+    portalWebsiteUrl: partner.portalWebsiteUrl,
+    portalSmsContent: partner.portalSmsContent,
+    documents: partner.portalDocuments,
+    speakers: partner.portalSeminarSpeakers,
+    representatives: partner.portalRepresentatives,
+  });
+
+  const applicableKeys = (
+    [
+      "logo",
+      "fascia_name",
+      "website_link",
+      "souvenir_writeup",
+      "ad_creative",
+      "sms_content",
+      "speaker_details",
+    ] as PortalSubmissionKey[]
+  ).filter((key) => entitlements[key].applicable);
+
   const logoDoc = findDoc(partner as Partner, "logo");
-  const writeupDoc = findDoc(partner as Partner, "souvenir_writeup");
-  const adDoc = findDoc(partner as Partner, "ad_creative");
 
-  const seminars = allottedSeminars(partner.seminarSlotAssignments);
-  const speakersComplete =
-    seminars.length === 0 ||
-    seminars.every((slot) =>
-      (partner.portalSeminarSpeakers ?? []).some(
-        (row) =>
-          row.eventId === slot.eventId &&
-          row.seminarId === slot.seminarId &&
-          row.speakers.some(
-            (s) =>
-              Boolean(s.name.trim()) &&
-              Boolean(s.designation?.trim()) &&
-              /^[6-9]\d{9}$/.test(
-                String(s.contact ?? s.phone ?? "").replace(/\D/g, "").slice(-10)
-              ) &&
-              Boolean(s.introduction?.trim()) &&
-              Boolean(s.photoUrl?.trim())
-          )
-      )
-    );
-
-  const items = [
-    { key: "logo", label: "University Logo", complete: Boolean(logoDoc) },
-    {
-      key: "fascia_name",
-      label: "Fascia Name",
-      complete: Boolean(partner.portalFasciaName?.trim()),
-    },
-    {
-      key: "website_link",
-      label: "Website link",
-      complete: Boolean(partner.portalWebsiteUrl?.trim()),
-    },
-    {
-      key: "souvenir_writeup",
-      label: "Souvenir write-up",
-      complete: Boolean(writeupDoc),
-    },
-    {
-      key: "ad_creative",
-      label: "Ad creative",
-      complete: Boolean(adDoc),
-    },
-    {
-      key: "sms_content",
-      label: "SMS content",
-      complete: Boolean(partner.portalSmsContent?.trim()),
-    },
-    {
-      key: "speaker_details",
-      label: "Speaker details",
-      complete: speakersComplete,
-    },
-  ];
+  const items = applicableKeys.map((key) => {
+    const complete = entitlements[key].complete;
+    if (key === "logo") {
+      return { key, label: "University Logo", complete: Boolean(logoDoc) };
+    }
+    if (key === "fascia_name") {
+      return { key, label: "Fascia Name", complete };
+    }
+    if (key === "website_link") {
+      return { key, label: "Website link", complete };
+    }
+    if (key === "souvenir_writeup") {
+      return {
+        key,
+        label: "Souvenir write-up",
+        complete: Boolean(findDoc(partner as Partner, "souvenir_writeup")),
+      };
+    }
+    if (key === "ad_creative") {
+      return {
+        key,
+        label: "Ad creative",
+        complete: Boolean(findDoc(partner as Partner, "ad_creative")),
+      };
+    }
+    if (key === "sms_content") {
+      return { key, label: "SMS content", complete };
+    }
+    return { key, label: "Speaker details", complete };
+  });
 
   const missing = items.filter((i) => !i.complete);
   const completed = items.length - missing.length;
@@ -134,8 +168,9 @@ export function getPartnerPortalUploadStatus(
     items,
     missing,
     allComplete: missing.length === 0,
-    progress: completed / items.length,
+    progress: items.length === 0 ? 1 : completed / items.length,
     completed,
     total: items.length,
+    entitlements,
   };
 }

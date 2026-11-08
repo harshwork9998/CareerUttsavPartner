@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { PORTAL_SUBMISSION_ITEMS } from "@/lib/partner-portal-docs";
+import { submissionItemsForPartner } from "@/lib/partner-portal-docs";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
 import { SMS_CONTENT_MAX_LENGTH } from "@/lib/sms-content";
 import { PORTAL_UPLOAD_ACCEPT, validateUploadFile } from "@/lib/upload-policy";
@@ -112,7 +112,7 @@ export function SubmissionsSection({
       </div>
 
       <div className="space-y-3">
-        {PORTAL_SUBMISSION_ITEMS.map((item) => {
+        {submissionItemsForPartner(partner).map((item) => {
           if (item.type === "text" || item.type === "url") {
             const value =
               item.field === "portalFasciaName"

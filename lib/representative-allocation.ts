@@ -1,3 +1,5 @@
+import { validateRepresentativeRole } from "@/lib/representative-role";
+
 export type RepresentativeFields = {
   name: string;
   designation: string;
@@ -81,6 +83,10 @@ export function collectRepresentativeSubmission(
     if (isBlankRepresentative({ name, designation, phone })) continue;
     if (!name || !designation || !phone || !isValidPhone(phone)) {
       return { ok: false, error: REPRESENTATIVE_ROW_ERROR };
+    }
+    const roleError = validateRepresentativeRole(designation);
+    if (roleError) {
+      return { ok: false, error: roleError };
     }
     representatives.push({ name, designation, phone });
   }

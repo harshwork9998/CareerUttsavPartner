@@ -85,6 +85,8 @@ export function resolveEventPartnerships(partner: Partner): PartnerEventPartners
   }));
 }
 
+const SEMINAR_SCHEDULE_UNSET_LABEL = "TBD";
+
 export function formatSeminarWhen(seminar: {
   date: string;
   startTime: string;
@@ -96,7 +98,7 @@ export function formatSeminarWhen(seminar: {
         day: "numeric",
         month: "short",
       })
-    : "";
+    : SEMINAR_SCHEDULE_UNSET_LABEL;
   const fmt = (t: string) => {
     const [h, m] = t.split(":").map(Number);
     const d = new Date();
@@ -106,10 +108,12 @@ export function formatSeminarWhen(seminar: {
       minute: "2-digit",
     });
   };
+  const start = seminar.startTime?.trim();
+  const end = seminar.endTime?.trim();
   const time =
-    seminar.startTime && seminar.endTime
-      ? `${fmt(seminar.startTime)} – ${fmt(seminar.endTime)}`
-      : "";
+    start && end
+      ? `${fmt(start)} – ${fmt(end)}`
+      : SEMINAR_SCHEDULE_UNSET_LABEL;
   const hall = seminar.hall ? `Hall ${seminar.hall}` : "";
   return [day, time, hall].filter(Boolean).join(" · ");
 }

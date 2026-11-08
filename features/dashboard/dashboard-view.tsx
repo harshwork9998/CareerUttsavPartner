@@ -9,7 +9,10 @@ import { motion } from "framer-motion";
 import { HeroSection } from "@/features/dashboard/hero-section";
 import { PackageSection } from "@/features/dashboard/package-section";
 import { SeminarSection } from "@/features/dashboard/seminar-section";
-import { RepresentativesSection } from "@/features/dashboard/representatives-section";
+import {
+  RepresentativesSection,
+  hasRepresentativeAllocation,
+} from "@/features/dashboard/representatives-section";
 import { SubmissionsSection } from "@/features/dashboard/submissions-section";
 import { PasswordModal } from "@/features/dashboard/password-modal";
 import { readFileAsDataUrl } from "@/lib/utils";
@@ -282,19 +285,21 @@ export function DashboardView() {
                 }
               }}
             />
-            <RepresentativesSection
-              partner={partner}
-              packages={packages}
-              saving={patchMutation.isPending}
-              onSave={async (payload) => {
-                await patchMutation.mutateAsync({
-                  action: "representatives",
-                  eventId: payload.eventId,
-                  count: payload.count,
-                  representatives: payload.representatives,
-                });
-              }}
-            />
+            {hasRepresentativeAllocation(packages) ? (
+              <RepresentativesSection
+                partner={partner}
+                packages={packages}
+                saving={patchMutation.isPending}
+                onSave={async (payload) => {
+                  await patchMutation.mutateAsync({
+                    action: "representatives",
+                    eventId: payload.eventId,
+                    count: payload.count,
+                    representatives: payload.representatives,
+                  });
+                }}
+              />
+            ) : null}
           </div>
 
           <div className="min-w-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pr-1">

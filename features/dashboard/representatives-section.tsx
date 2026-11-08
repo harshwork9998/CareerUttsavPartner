@@ -11,12 +11,26 @@ import {
   initialRepresentativeRows,
   isBlankRepresentative,
 } from "@/lib/representative-allocation";
+import {
+  REPRESENTATIVE_ROLE_OPTIONS,
+  isAllowedRepresentativeRole,
+} from "@/lib/representative-role";
 import type {
   EventPackageSummary,
   Partner,
   PartnerRepresentative,
   PartnerRepresentativesSubmission,
 } from "@/lib/types";
+
+export function hasRepresentativeAllocation(
+  packages: EventPackageSummary[]
+): boolean {
+  return packages.some(
+    (pkg) =>
+      typeof pkg.representativeSlotCount === "number" &&
+      pkg.representativeSlotCount > 0
+  );
+}
 
 function emptyRepresentative(): PartnerRepresentative {
   return { name: "", designation: "", phone: "" };
@@ -122,14 +136,25 @@ function EventRepresentativesForm({
                 onChange={(e) => patchRep(index, { name: e.target.value })}
                 className={`cu-input !h-10${nameMissing ? " !border-cu-red" : ""}`}
               />
-              <input
-                type="text"
-                aria-label={`Representative ${index + 1} designation`}
-                placeholder="Designation"
-                value={rep.designation ?? ""}
+              <select
+                aria-label={`Representative ${index + 1} role`}
+                value={
+                  isAllowedRepresentativeRole(rep.designation)
+                    ? rep.designation ?? ""
+                    : ""
+                }
                 onChange={(e) => patchRep(index, { designation: e.target.value })}
                 className={`cu-input !h-10${designationMissing ? " !border-cu-red" : ""}`}
-              />
+              >
+                <option value="" disabled>
+                  Representative Role
+                </option>
+                {REPRESENTATIVE_ROLE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
               <PhoneField
                 value={rep.phone}
                 showError={partial}
@@ -222,6 +247,10 @@ export function RepresentativesSection({
     representatives: PartnerRepresentative[];
   }) => Promise<void>;
 }) {
+  if (!hasRepresentativeAllocation(packages)) {
+    return null;
+  }
+
   const multiCity = packages.length > 1;
   const submissions = partner.portalRepresentatives ?? [];
   const hasSavedPeople = packages.some((pkg) =>

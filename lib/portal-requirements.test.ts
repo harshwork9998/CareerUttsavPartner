@@ -169,7 +169,7 @@ describe("representative allocation", () => {
 describe("representative submission maximum", () => {
   const valid = (name: string) => ({
     name,
-    designation: "Director",
+    designation: "Leadership / Management",
     phone: "9876543210",
   });
 
