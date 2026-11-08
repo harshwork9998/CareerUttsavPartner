@@ -34,7 +34,13 @@ async function fetchDashboard(): Promise<DashboardPayload> {
     credentials: "same-origin",
     cache: "no-store",
   });
+  if (res.status === 503 || res.headers.get("x-cu-auth") === "unavailable") {
+    throw new Error("unavailable");
+  }
   if (res.status === 401) {
+    if (res.headers.get("x-cu-auth") === "stale") {
+      throw new Error("stale");
+    }
     throw new Error("unauthorized");
   }
   if (!res.ok) {
@@ -119,6 +125,20 @@ export function DashboardView() {
   if (isError || !data) {
     if (error?.message === "unauthorized") {
       return null;
+    }
+    if (error?.message === "unavailable" || error?.message === "stale") {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-5 text-center">
+          <p className="font-display text-2xl font-bold">
+            {error.message === "stale"
+              ? "Your session was updated"
+              : "The portal is temporarily unavailable"}
+          </p>
+          <button type="button" onClick={() => void refetch()} className="cu-btn-primary">
+            Retry
+          </button>
+        </div>
+      );
     }
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-5 text-center">

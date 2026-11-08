@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { readSession } from "@/lib/session";
 import { LoginView } from "@/features/login/login-view";
 
 export default async function LoginPage({
@@ -8,7 +8,7 @@ export default async function LoginPage({
   searchParams: Promise<{ reset?: string }>;
 }) {
   const params = await searchParams;
-  const session = await getSession();
-  if (session) redirect("/dashboard");
+  const session = await readSession();
+  if (session.status === "ok") redirect("/dashboard");
   return <LoginView resetSuccess={params.reset === "success"} />;
 }

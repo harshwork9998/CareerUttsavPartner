@@ -479,8 +479,10 @@ function SpeakerCard({
   );
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [draftLocked, setDraftLocked] = useState(false);
 
   useEffect(() => {
+    if (draftLocked) return;
     setSpeakers(
       initialSpeakers.length
         ? initialSpeakers.map(normalizeSpeaker)
@@ -488,7 +490,7 @@ function SpeakerCard({
     );
     setAttemptedSave(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSpeakers]);
+  }, [initialSpeakers, draftLocked]);
 
   const speakerComplete = (s: PartnerSeminarSpeakerDetail) =>
     Boolean(
@@ -514,6 +516,7 @@ function SpeakerCard({
     index: number,
     patch: Partial<PartnerSeminarSpeakerDetail>
   ) => {
+    setDraftLocked(true);
     setSpeakers((prev) =>
       prev.map((row, i) => (i === index ? { ...row, ...patch } : row))
     );
@@ -631,18 +634,23 @@ function SpeakerCard({
               return;
             }
             setFormError(null);
-            void onSave(
-              speakers
-                .filter(speakerComplete)
-                .map((s) => {
-                  const linkedIn = validateLinkedInProfile(s.linkedinProfile);
-                  return {
-                    ...s,
-                    contact: normalizeIndianMobile(s.contact ?? ""),
-                    linkedinProfile: linkedIn.ok ? linkedIn.value : "",
-                  };
-                })
-            );
+            const payload = speakers
+              .filter(speakerComplete)
+              .map((s) => {
+                const linkedIn = validateLinkedInProfile(s.linkedinProfile);
+                return {
+                  ...s,
+                  contact: normalizeIndianMobile(s.contact ?? ""),
+                  linkedinProfile: linkedIn.ok ? linkedIn.value : "",
+                };
+              });
+            void onSave(payload)
+              .then(() => setDraftLocked(false))
+              .catch((error: unknown) => {
+                setFormError(
+                  error instanceof Error ? error.message : "Could not save speakers."
+                );
+              });
           }}
           className="mt-3 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white disabled:opacity-50"
         >

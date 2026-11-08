@@ -6,11 +6,68 @@ import {
   resetLoginRateLimits,
 } from "@/lib/login-rate-limit";
 import {
+  classifyPartnerSession,
   partnerSessionIsActive,
   temporaryPasswordChangeRequired,
 } from "@/lib/session-policy";
 
 describe("partner session policy", () => {
+  it("does not treat an Admin outage as a logged-out session", () => {
+    expect(
+      classifyPartnerSession({
+        hasCookie: true,
+        auth: { ok: false, unreachable: true },
+        sessionAuthVersion: 2,
+        sessionLogin: "dean@example.edu",
+      }).status
+    ).toBe("unavailable");
+  });
+
+  it("rejects a genuinely invalid session", () => {
+    expect(
+      classifyPartnerSession({
+        hasCookie: true,
+        auth: {
+          ok: true,
+          portalAccessEnabled: false,
+          portalAuthVersion: 2,
+          portalLogin: "dean@example.edu",
+        },
+        sessionAuthVersion: 2,
+        sessionLogin: "dean@example.edu",
+      }).status
+    ).toBe("invalid");
+  });
+
+  it("marks an older cookie stale after a password change without calling it revoked", () => {
+    expect(
+      classifyPartnerSession({
+        hasCookie: true,
+        auth: {
+          ok: true,
+          portalAccessEnabled: true,
+          portalAuthVersion: 3,
+          portalLogin: "dean@example.edu",
+        },
+        sessionAuthVersion: 2,
+        sessionLogin: "dean@example.edu",
+      }).status
+    ).toBe("stale");
+    expect(
+      classifyPartnerSession({
+        hasCookie: true,
+        auth: {
+          ok: true,
+          portalAccessEnabled: true,
+          portalAuthVersion: 3,
+          portalLogin: "dean@example.edu",
+        },
+        sessionAuthVersion: 3,
+        sessionLogin: "dean@example.edu",
+      }).status
+    ).toBe("ok");
+  });
+
   it("requires a password change until portalPasswordChangedAt is set", () => {
     expect(temporaryPasswordChangeRequired(undefined)).toBe(true);
     expect(temporaryPasswordChangeRequired(null)).toBe(true);

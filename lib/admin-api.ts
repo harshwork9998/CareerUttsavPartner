@@ -498,6 +498,39 @@ export async function fetchAdminPortalDocumentAccessUrl(
   }
 }
 
+export async function postAdminPortalSubmission(
+  partnerId: string,
+  body: Record<string, unknown>
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  try {
+    const res = await fetch(
+      `${ADMIN_API_URL}/api/partner-portal/partners/${partnerId}/submissions`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...partnerServiceHeaders(),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }
+    );
+    if (res.ok) return { ok: true };
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+    return {
+      ok: false,
+      status: res.status || 502,
+      error: payload?.error ?? "Could not save this update. Please try again.",
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 503,
+      error: "Could not save this update. Please try again.",
+    };
+  }
+}
+
 export async function patchAdminPartner(
   id: string,
   patch: Partial<Partner>

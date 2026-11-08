@@ -2,7 +2,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { fetchAdminAuthState } from "@/lib/admin-api";
-import { partnerSessionIsActive, temporaryPasswordChangeRequired } from "@/lib/session-policy";
+import { classifyPartnerSession, temporaryPasswordChangeRequired } from "@/lib/session-policy";
+import type { PartnerSessionLookup } from "@/lib/session-policy";
 import type { PortalSession } from "@/lib/types";
 
 const COOKIE = "cu_partner_session";
@@ -78,35 +79,72 @@ function decodeSession(raw: string): PortalSession | null {
   }
 }
 
-export async function getSession(): Promise<PortalSession | null> {
+export type SessionRead =
+  | { status: "ok"; session: PortalSession }
+  | { status: Exclude<PartnerSessionLookup["status"], "ok"> };
+
+export async function readSession(): Promise<SessionRead> {
   const jar = await cookies();
   const raw = jar.get(COOKIE)?.value;
-  if (!raw) return null;
+  if (!raw) return { status: "missing" };
 
-  const session = decodeSession(raw);
-  if (!session?.partnerId || !session?.login) return null;
+  const decoded = decodeSession(raw);
+  if (!decoded?.partnerId || !decoded?.login) return { status: "invalid" };
 
-  const auth = await fetchAdminAuthState(session.partnerId);
-  if (!auth.ok) return null;
-  if (
-    !partnerSessionIsActive({
-      portalAccessEnabled: auth.state.portalAccessEnabled,
-      portalAuthVersion: auth.state.portalAuthVersion,
-      portalLogin: auth.state.portalLogin,
-      sessionAuthVersion: session.authVersion ?? 0,
-      sessionLogin: session.login,
-    })
-  ) {
-    return null;
+  const auth = await fetchAdminAuthState(decoded.partnerId);
+  const verdict = classifyPartnerSession({
+    hasCookie: true,
+    auth: auth.ok
+      ? {
+          ok: true,
+          portalAccessEnabled: auth.state.portalAccessEnabled,
+          portalAuthVersion: auth.state.portalAuthVersion,
+          portalLogin: auth.state.portalLogin,
+        }
+      : { ok: false, unreachable: auth.unreachable },
+    sessionAuthVersion: decoded.authVersion ?? 0,
+    sessionLogin: decoded.login,
+  });
+  if (verdict.status !== "ok" || !auth.ok) {
+    return { status: verdict.status === "ok" ? "invalid" : verdict.status };
   }
 
   return {
-    ...session,
-    authVersion: auth.state.portalAuthVersion,
-    mustChangePassword: temporaryPasswordChangeRequired(
-      auth.state.portalPasswordChangedAt
-    ),
+    status: "ok",
+    session: {
+      ...decoded,
+      authVersion: auth.state.portalAuthVersion,
+      mustChangePassword: temporaryPasswordChangeRequired(
+        auth.state.portalPasswordChangedAt
+      ),
+    },
   };
+}
+
+export async function getSession(): Promise<PortalSession | null> {
+  const read = await readSession();
+  return read.status === "ok" ? read.session : null;
+}
+
+export function sessionFailureResponse(status: Exclude<SessionRead["status"], "ok">) {
+  if (status === "unavailable") {
+    return NextResponse.json(
+      { error: "Partner portal is temporarily unavailable. Please try again." },
+      { status: 503, headers: { "x-cu-auth": "unavailable" } }
+    );
+  }
+  if (status === "stale") {
+    return NextResponse.json(
+      { error: "Your session was updated. Refresh to continue." },
+      { status: 401, headers: { "x-cu-auth": "stale" } }
+    );
+  }
+  return withoutSession(
+    NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "x-cu-auth": "invalid" } }
+    )
+  );
 }
 
 /** Attach session on the response — required for Route Handlers. */

@@ -2,27 +2,21 @@ import { NextResponse } from "next/server";
 import {
   changeAdminPartnerPassword,
   fetchAdminSeminarTopics,
-  patchAdminPartner,
-  pickPortalSyncPatch,
+  postAdminPortalSubmission,
   saveAdminSeminarTopics,
 } from "@/lib/admin-api";
 import {
   getEvents,
-  getPartnerById,
   getPartnerForSession,
   mergeAdminPartners,
-  setRepresentatives,
-  setSeminarSpeakers,
   updatePartner,
-  upsertPortalDocument,
-  removePortalDocument,
 } from "@/lib/partner-store";
 import {
   buildEventPackageSummaries,
   enrichSeminarSlotAssignments,
   resolveEventPartnerships,
 } from "@/lib/partner-event-config";
-import { getSession, withSession, withoutSession } from "@/lib/session";
+import { readSession, sessionFailureResponse, withSession, withoutSession } from "@/lib/session";
 import { getPartnerPortalUploadStatus } from "@/lib/partner-portal-docs";
 import { validateLinkedInProfile } from "@/lib/linkedin-profile";
 import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/phone";
@@ -46,14 +40,18 @@ function invalidSessionResponse() {
   );
 }
 
+async function requirePortalSession() {
+  const read = await readSession();
+  if (read.status !== "ok") return sessionFailureResponse(read.status);
+  return read.session;
+}
+
 export async function GET() {
   // Merge Admin partners before session validation so a valid cookie is not
   // rejected solely because this worker's in-memory store was still cold.
   await mergeAdminPartners();
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requirePortalSession();
+  if (session instanceof NextResponse) return session;
 
   try {
     const partner = getPartnerForSession(session);
@@ -101,26 +99,23 @@ export async function GET() {
   }
 }
 
-async function syncPartnerPortalToAdmin(partnerId: string): Promise<boolean> {
-  const partner = getPartnerById(partnerId);
-  if (!partner) return false;
-  return patchAdminPartner(partner.id, pickPortalSyncPatch(partner));
-}
-
-function syncFailedResponse() {
-  return NextResponse.json(
-    { error: "Could not save this update. Please try again." },
-    { status: 502 }
-  );
+async function persistSubmission(
+  partnerId: string,
+  body: Parameters<typeof postAdminPortalSubmission>[1]
+) {
+  const saved = await postAdminPortalSubmission(partnerId, body);
+  if (!saved.ok) {
+    return NextResponse.json({ error: saved.error }, { status: saved.status });
+  }
+  await mergeAdminPartners();
+  return NextResponse.json({ ok: true });
 }
 
 export async function PATCH(request: Request) {
   // Same ordering as GET — required for skip_password_prompt ("I'll do it later").
   await mergeAdminPartners();
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requirePortalSession();
+  if (session instanceof NextResponse) return session;
 
   const body = await request.json();
   const partner = getPartnerForSession(session);
@@ -184,11 +179,11 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: smsError }, { status: 400 });
       }
     }
-    updatePartner(partner.id, { [field]: nextValue });
-    if (!(await syncPartnerPortalToAdmin(partner.id))) {
-      return syncFailedResponse();
-    }
-    return NextResponse.json({ ok: true });
+    return persistSubmission(partner.id, {
+      op: "set_field",
+      field,
+      value: nextValue,
+    });
   }
 
   if (body.action === "upload_document") {
@@ -210,18 +205,19 @@ export async function PATCH(request: Request) {
     if (uploadError) {
       return NextResponse.json({ error: uploadError }, { status: 400 });
     }
-    upsertPortalDocument(partner.id, {
-      kind: body.kind,
-      label: body.label,
-      fileName,
-      mimeType: body.mimeType,
-      url,
-      fileSizeBytes,
+    return persistSubmission(partner.id, {
+      op: "upsert_document",
+      document: {
+        id: `${partner.id}-${String(body.kind)}`,
+        kind: body.kind,
+        label: String(body.label ?? ""),
+        fileName,
+        mimeType: String(body.mimeType ?? ""),
+        url,
+        fileSizeBytes,
+        uploadedAt: new Date().toISOString(),
+      },
     });
-    if (!(await syncPartnerPortalToAdmin(partner.id))) {
-      return syncFailedResponse();
-    }
-    return NextResponse.json({ ok: true });
   }
 
   if (body.action === "remove_document") {
@@ -229,11 +225,7 @@ export async function PATCH(request: Request) {
     if (!kind) {
       return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
     }
-    removePortalDocument(partner.id, kind);
-    if (!(await syncPartnerPortalToAdmin(partner.id))) {
-      return syncFailedResponse();
-    }
-    return NextResponse.json({ ok: true });
+    return persistSubmission(partner.id, { op: "remove_document", kind });
   }
 
   if (body.action === "seminar_topics") {
@@ -331,23 +323,22 @@ export async function PATCH(request: Request) {
       );
     }
 
-    setSeminarSpeakers(
-      partner.id,
-      body.eventId,
-      body.seminarId,
-      speakers.map((speaker) => ({
-        name: speaker.name,
-        designation: speaker.designation,
-        contact: speaker.contact,
-        introduction: speaker.introduction,
-        photoUrl: speaker.photoUrl,
-        linkedinProfile: speaker.linkedinProfile || undefined,
-      }))
-    );
-    if (!(await syncPartnerPortalToAdmin(partner.id))) {
-      return syncFailedResponse();
-    }
-    return NextResponse.json({ ok: true });
+    return persistSubmission(partner.id, {
+      op: "upsert_speakers",
+      row: {
+        eventId: String(body.eventId ?? ""),
+        seminarId: String(body.seminarId ?? ""),
+        updatedAt: new Date().toISOString(),
+        speakers: speakers.map((speaker) => ({
+          name: speaker.name,
+          designation: speaker.designation,
+          contact: speaker.contact,
+          introduction: speaker.introduction,
+          photoUrl: speaker.photoUrl,
+          linkedinProfile: speaker.linkedinProfile || undefined,
+        })),
+      },
+    });
   }
 
   if (body.action === "representatives") {
@@ -405,16 +396,15 @@ export async function PATCH(request: Request) {
       prepared.representatives
     );
 
-    setRepresentatives(
-      partner.id,
-      eventId,
-      prepared.representatives.length,
-      representatives
-    );
-    if (!(await syncPartnerPortalToAdmin(partner.id))) {
-      return syncFailedResponse();
-    }
-    return NextResponse.json({ ok: true });
+    return persistSubmission(partner.id, {
+      op: "upsert_representatives",
+      row: {
+        eventId,
+        count: prepared.representatives.length,
+        representatives,
+        updatedAt: new Date().toISOString(),
+      },
+    });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
