@@ -21,6 +21,10 @@ describe("partner portal storage migration", () => {
       "utf8"
     );
     const route = readFileSync(join(process.cwd(), "app/api/partner/route.ts"), "utf8");
+    expect(dashboard).toContain("applyCommittedPartnerToDashboard");
+    expect(dashboard).toContain("mergeDashboardPayload");
+    expect(dashboard).toContain("placeholderData");
+    expect(dashboard).not.toContain("if (isError || !data)");
     expect(dashboard).not.toContain("readFileAsDataUrl");
     expect(hero).not.toContain("readFileAsDataUrl");
     expect(hero).toContain("uploadPortalDocumentWithStorage");
@@ -44,6 +48,8 @@ describe("partner portal storage migration", () => {
     expect(upload).not.toMatch(/Bearer \$\{publishableKey\}/);
     expect(upload).not.toContain("sb_secret");
     expect(upload).not.toContain("SUPABASE_SECRET_KEY");
+    expect(upload).toContain("ifMatchToken");
+    expect(upload).toContain("resolvedUploadContentType");
   });
 
   it("rejects empty files before upload", () => {

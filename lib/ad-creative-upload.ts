@@ -35,15 +35,17 @@ export async function commitAdCreativeUpload(input: {
   file: File;
   intent: AdCreativeUploadIntent;
   label: string;
+  ifMatchToken?: string;
 }): Promise<
   | { ok: true; partner: Partner }
-  | { ok: false; error: string }
+  | { ok: false; error: string; partner?: Partner }
 > {
   return commitPortalDocumentUpload({
     kind: "ad_creative",
     file: input.file,
     intent: input.intent,
     label: input.label,
+    ifMatchToken: input.ifMatchToken,
   });
 }
 
@@ -52,9 +54,10 @@ export async function uploadAdCreativeWithStorage(input: {
   label: string;
   onProgress: (percent: number) => void;
   onRetry?: () => void;
+  ifMatchToken?: string;
 }): Promise<
   | { ok: true; partner: Partner }
-  | { ok: false; error: string }
+  | { ok: false; error: string; partner?: Partner }
 > {
   return uploadPortalDocumentWithStorage({
     kind: "ad_creative",

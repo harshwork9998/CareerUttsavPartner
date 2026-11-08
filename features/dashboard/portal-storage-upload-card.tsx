@@ -3,7 +3,12 @@
 import { useCallback, useRef, useState } from "react";
 import { Check, Download, ExternalLink, FileUp, Upload } from "lucide-react";
 
-import { isStorageBackedPortalDocument } from "@/lib/partner-portal-document";
+import {
+  isStorageBackedPortalDocument,
+  portalDocumentMatchToken,
+} from "@/lib/partner-portal-document";
+import { documentFromCommittedPartner } from "@/lib/portal-dashboard-merge";
+import { resolvePortalUploadUi } from "@/lib/portal-upload-presentation";
 import {
   fetchPortalDocumentAccessUrl,
   uploadPortalDocumentWithStorage,
@@ -11,11 +16,12 @@ import {
 } from "@/lib/portal-storage-upload";
 import {
   formatUploadBytes,
+  PORTAL_DOCUMENT_FORMAT_LABEL,
   PORTAL_UPLOAD_ACCEPT,
   UPLOAD_INTERRUPTED_MESSAGE,
   validateUploadFile,
 } from "@/lib/upload-policy";
-import type { PartnerPortalDocument } from "@/lib/types";
+import type { Partner, PartnerPortalDocument } from "@/lib/types";
 
 export function PortalStorageUploadCard({
   kind,
@@ -34,9 +40,10 @@ export function PortalStorageUploadCard({
   helperText?: string;
   templateUrl?: string;
   templateLabel?: string;
-  onCommitted: () => void;
+  onCommitted: (partner: Partner) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceMode = useRef(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -44,11 +51,60 @@ export function PortalStorageUploadCard({
   const [stage, setStage] = useState<"idle" | "uploading" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [retryHint, setRetryHint] = useState<string | null>(null);
+  const [confirmedDoc, setConfirmedDoc] = useState<PartnerPortalDocument | undefined>();
 
-  const done = Boolean(doc);
+  const ui = resolvePortalUploadUi({
+    serverDoc: doc,
+    confirmedDoc,
+    selectedFile: Boolean(selectedFile),
+    uploading,
+    saving: uploading && stage === "saving",
+    failed: stage === "error",
+  });
+  const displayDoc = ui.displayDoc;
+  const done = Boolean(displayDoc);
+
+  const runUpload = useCallback(
+    async (file: File) => {
+      if (uploading) return;
+      setUploading(true);
+      setProgress(0);
+      setStage("uploading");
+      setMessage(null);
+      setRetryHint(null);
+
+      const result = await uploadPortalDocumentWithStorage({
+        kind,
+        file,
+        label,
+        ifMatchToken: portalDocumentMatchToken(displayDoc),
+        onProgress: (percent) => {
+          setProgress(percent);
+          if (percent >= 100) setStage("saving");
+        },
+        onRetry: () => setRetryHint(UPLOAD_INTERRUPTED_MESSAGE),
+      });
+
+      if (!result.ok) {
+        setUploading(false);
+        setStage("error");
+        setMessage(result.error);
+        if (result.partner) onCommitted(result.partner);
+        return;
+      }
+
+      setConfirmedDoc(documentFromCommittedPartner(result.partner, kind));
+      setStage("success");
+      setMessage("Submitted.");
+      setSelectedFile(null);
+      setUploading(false);
+      onCommitted(result.partner);
+    },
+    [displayDoc, kind, label, onCommitted, uploading]
+  );
 
   const pickFile = useCallback(
-    (file: File | undefined) => {
+    (file: File | undefined, autoStart = false) => {
       if (!file || uploading) return;
       const error = validateUploadFile({
         fileName: file.name,
@@ -66,51 +122,43 @@ export function PortalStorageUploadCard({
       setMessage(null);
       setProgress(0);
       setRetryHint(null);
+      if (autoStart) void runUpload(file);
     },
-    [uploading]
+    [runUpload, uploading]
   );
 
-  const startUpload = useCallback(async () => {
-    if (!selectedFile || uploading) return;
-    setUploading(true);
-    setProgress(0);
-    setStage("uploading");
-    setMessage(null);
-    setRetryHint(null);
-
-    const result = await uploadPortalDocumentWithStorage({
-      kind,
-      file: selectedFile,
-      label,
-      onProgress: (percent) => {
-        setProgress(percent);
-        if (percent >= 100) setStage("saving");
-      },
-      onRetry: () => setRetryHint(UPLOAD_INTERRUPTED_MESSAGE),
-    });
-
-    setUploading(false);
-    if (!result.ok) {
-      setStage("error");
-      setMessage(result.error);
-      return;
-    }
-
-    setStage("success");
-    setMessage("File saved.");
-    setSelectedFile(null);
-    onCommitted();
-  }, [kind, label, onCommitted, selectedFile, uploading]);
-
   const openSubmitted = useCallback(async () => {
-    if (!doc) return;
-    if (doc.url?.trim() && !isStorageBackedPortalDocument(doc)) {
-      window.open(doc.url, "_blank", "noopener,noreferrer");
+    if (!displayDoc) return;
+    if (displayDoc.url?.trim() && !isStorageBackedPortalDocument(displayDoc)) {
+      window.open(displayDoc.url, "_blank", "noopener,noreferrer");
       return;
     }
     const url = await fetchPortalDocumentAccessUrl(kind);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
-  }, [doc, kind]);
+  }, [displayDoc, kind]);
+
+  const downloadSubmitted = useCallback(async () => {
+    if (!displayDoc) return;
+    let href = displayDoc.url?.trim() || "";
+    if (!href || isStorageBackedPortalDocument(displayDoc)) {
+      href = (await fetchPortalDocumentAccessUrl(kind)) ?? "";
+    }
+    if (!href) return;
+    try {
+      const res = await fetch(href);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = displayDoc.fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(href, "_blank", "noopener,noreferrer");
+    }
+  }, [displayDoc, kind]);
 
   return (
     <div
@@ -137,7 +185,7 @@ export function PortalStorageUploadCard({
         e.preventDefault();
         setDragActive(false);
         if (uploading) return;
-        pickFile(e.dataTransfer.files?.[0]);
+        pickFile(e.dataTransfer.files?.[0], done);
       }}
     >
       <input
@@ -147,7 +195,8 @@ export function PortalStorageUploadCard({
         className="hidden"
         disabled={uploading}
         onChange={(e) => {
-          pickFile(e.target.files?.[0]);
+          pickFile(e.target.files?.[0], replaceMode.current || done);
+          replaceMode.current = false;
           e.target.value = "";
         }}
       />
@@ -156,7 +205,10 @@ export function PortalStorageUploadCard({
         <button
           type="button"
           disabled={uploading}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => {
+            replaceMode.current = done;
+            inputRef.current?.click();
+          }}
           className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-cu-red shadow-sm disabled:opacity-50"
         >
           {done ? <FileUp className="h-5 w-5" /> : <Upload className="h-5 w-5" />}
@@ -166,12 +218,14 @@ export function PortalStorageUploadCard({
           <p className="mt-0.5 text-xs text-ink-muted">
             {selectedFile
               ? `${selectedFile.name} · ${formatUploadBytes(selectedFile.size)}`
-              : done && doc
-                ? `Uploaded · ${doc.fileName}${doc.fileSizeBytes ? ` · ${formatUploadBytes(doc.fileSizeBytes)}` : ""}`
-                : helperText ?? "Click or drag a file here"}
+              : ui.phase === "finalizing" && displayDoc
+                ? `Saving · ${displayDoc.fileName}`
+                : done && displayDoc
+                ? `Submitted · ${displayDoc.fileName}${displayDoc.fileSizeBytes ? ` · ${formatUploadBytes(displayDoc.fileSizeBytes)}` : ""}`
+                : helperText ?? `Click or drag a file here (${PORTAL_DOCUMENT_FORMAT_LABEL})`}
           </p>
         </div>
-        {done && stage !== "success" ? (
+        {done ? (
           <Check className="h-4 w-4 shrink-0 text-cu-green" strokeWidth={3} />
         ) : null}
       </div>
@@ -179,7 +233,13 @@ export function PortalStorageUploadCard({
       {uploading ? (
         <div className="mt-3 space-y-1.5">
           <div className="flex justify-between text-[11px] font-semibold text-ink-soft">
-            <span>{stage === "saving" ? "Verifying…" : "Uploading…"}</span>
+            <span>
+              {stage === "saving"
+                ? "Verifying / Saving…"
+                : done
+                  ? "Replacing…"
+                  : "Uploading…"}
+            </span>
             <span className="tabular-nums">{progress}%</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-ink/10">
@@ -197,7 +257,7 @@ export function PortalStorageUploadCard({
       {selectedFile && !uploading ? (
         <button
           type="button"
-          onClick={() => void startUpload()}
+          onClick={() => void runUpload(selectedFile)}
           className="mt-3 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white"
         >
           {stage === "error" ? "Retry" : "Upload"}
@@ -215,15 +275,36 @@ export function PortalStorageUploadCard({
         </a>
       ) : null}
 
-      {done && doc ? (
-        <button
-          type="button"
-          onClick={() => void openSubmitted()}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-cu-blue"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          View current file
-        </button>
+      {done && displayDoc ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void openSubmitted()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View / Download
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadSubmitted()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </button>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => {
+              replaceMode.current = true;
+              inputRef.current?.click();
+            }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-cu-red px-3 text-xs font-bold text-white disabled:opacity-50"
+          >
+            Replace Document
+          </button>
+        </div>
       ) : null}
 
       {stage === "success" && message ? (

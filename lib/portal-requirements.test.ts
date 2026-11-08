@@ -320,7 +320,7 @@ describe("uploads and advertisement labels", () => {
     ).toBe(OVERSIZE_FILE_MESSAGE);
   });
 
-  it("keeps format and size limits out of the normal upload copy", () => {
+  it("advertises the approved document formats and speaker photo formats", () => {
     const hero = readFileSync(
       path.join(root, "features/dashboard/hero-section.tsx"),
       "utf8"
@@ -329,11 +329,19 @@ describe("uploads and advertisement labels", () => {
       path.join(root, "features/dashboard/submissions-section.tsx"),
       "utf8"
     );
+    const writeup = readFileSync(
+      path.join(root, "features/dashboard/portal-storage-upload-card.tsx"),
+      "utf8"
+    );
     expect(hero).toContain(`accept={PORTAL_UPLOAD_ACCEPT}`);
+    expect(hero).toContain("PORTAL_DOCUMENT_FORMAT_LABEL");
+    expect(hero).toContain("Replace Document");
     expect(hero).not.toContain("40 MB");
-    expect(hero).not.toContain("PNG or SVG");
-    expect(submissions).not.toContain("PNG or JPG");
+    expect(submissions).toContain("PORTAL_SPEAKER_PHOTO_ACCEPT");
+    expect(submissions).toContain("Change Photo");
     expect(submissions).not.toContain("40 MB");
+    expect(writeup).toContain("Replace Document");
+    expect(writeup).toContain("View / Download");
     expect(PORTAL_UPLOAD_ACCEPT).toBe(".svg,.png,.jpg,.jpeg,.pdf,.cdr,.ai,.eps");
   });
 

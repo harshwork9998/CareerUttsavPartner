@@ -15,18 +15,15 @@ import {
 } from "@/features/dashboard/representatives-section";
 import { SubmissionsSection } from "@/features/dashboard/submissions-section";
 import { PasswordModal } from "@/features/dashboard/password-modal";
-import type { PartnerSeminarTopicCatalog } from "@/lib/seminar-topics";
-import type { EventPackageSummary, Partner } from "@/lib/types";
+import {
+  applyCommittedPartnerToDashboard,
+  applyRemovedDocumentToDashboard,
+  mergeDashboardPayload,
+  type PartnerDashboardCache,
+} from "@/lib/portal-dashboard-merge";
+import type { Partner } from "@/lib/types";
 
-type DashboardPayload = {
-  partner: Partner;
-  packages: EventPackageSummary[];
-  seminarTopics?: PartnerSeminarTopicCatalog | null;
-  mustChangePassword: boolean;
-  uploadStatus?: ReturnType<
-    typeof import("@/lib/partner-portal-docs").getPartnerPortalUploadStatus
-  >;
-};
+type DashboardPayload = PartnerDashboardCache;
 
 async function fetchDashboard(): Promise<DashboardPayload> {
   const res = await fetch("/api/partner", {
@@ -54,12 +51,19 @@ export function DashboardView() {
   const queryClient = useQueryClient();
   const [passwordOpen, setPasswordOpen] = useState(false);
 
-  const { data, isPending, isError, error, refetch } = useQuery({
+  const { data, isPending, error, refetch } = useQuery({
     queryKey: ["partner-dashboard"],
-    queryFn: fetchDashboard,
+    queryFn: async () => {
+      const payload = await fetchDashboard();
+      const current = queryClient.getQueryData<DashboardPayload>([
+        "partner-dashboard",
+      ]);
+      return mergeDashboardPayload(current, payload);
+    },
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
+    placeholderData: (previous) => previous,
   });
 
   const openChangePassword = () => {
@@ -77,6 +81,17 @@ export function DashboardView() {
 
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ["partner-dashboard"] });
+
+  const applyCommittedPartner = (partner: Partner) => {
+    queryClient.setQueryData<DashboardPayload>(["partner-dashboard"], (current) =>
+      applyCommittedPartnerToDashboard(current, partner)
+    );
+  };
+
+  const onStorageCommitted = (partner: Partner) => {
+    applyCommittedPartner(partner);
+    refresh();
+  };
 
   useEffect(() => {
     if (isPending || error?.message !== "unauthorized") return;
@@ -121,7 +136,7 @@ export function DashboardView() {
     );
   }
 
-  if (isError || !data) {
+  if (!data) {
     if (error?.message === "unauthorized") {
       return null;
     }
@@ -248,8 +263,12 @@ export function DashboardView() {
         <HeroSection
           partner={partner}
           packages={packages}
-          onCommitted={refresh}
+          onCommitted={onStorageCommitted}
           onLogoRemove={async () => {
+            queryClient.setQueryData<DashboardPayload>(
+              ["partner-dashboard"],
+              (current) => applyRemovedDocumentToDashboard(current, "logo")
+            );
             await patchMutation.mutateAsync({
               action: "remove_document",
               kind: "logo",
@@ -320,8 +339,8 @@ export function DashboardView() {
                   value,
                 });
               }}
-              onStorageCommitted={() => refresh()}
-              onAdCreativeCommitted={() => refresh()}
+              onStorageCommitted={onStorageCommitted}
+              onAdCreativeCommitted={onStorageCommitted}
               onSaveSpeakers={async (eventId, seminarId, speakers) => {
                 await patchMutation.mutateAsync({
                   action: "seminar_speakers",

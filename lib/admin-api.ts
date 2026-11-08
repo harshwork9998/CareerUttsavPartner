@@ -426,10 +426,11 @@ export async function commitAdminAdCreativeUpload(
     fileSizeBytes: number;
     storageBucket: string;
     storagePath: string;
+    ifMatchToken?: string;
   }
 ): Promise<
   | { ok: true; partner: Partner }
-  | { ok: false; status: number; error: string }
+  | { ok: false; status: number; error: string; partner?: Partner }
 > {
   try {
     const res = await fetch(
@@ -452,6 +453,7 @@ export async function commitAdminAdCreativeUpload(
         ok: false,
         status: res.status,
         error: payload?.error ?? "Could not save upload.",
+        partner: mapAdminPartnerToPortal(payload ?? {}) ?? undefined,
       };
     }
     const partner = mapAdminPartnerToPortal(payload ?? {});
@@ -518,10 +520,11 @@ export async function commitAdminPortalDocumentUpload(
     fileSizeBytes: number;
     storageBucket: string;
     storagePath: string;
+    ifMatchToken?: string;
   }
 ): Promise<
   | { ok: true; partner: Partner }
-  | { ok: false; status: number; error: string }
+  | { ok: false; status: number; error: string; partner?: Partner }
 > {
   try {
     const res = await fetch(
@@ -544,6 +547,7 @@ export async function commitAdminPortalDocumentUpload(
         ok: false,
         status: res.status,
         error: payload?.error ?? "Could not save upload.",
+        partner: mapAdminPartnerToPortal(payload ?? {}) ?? undefined,
       };
     }
     const partner = mapAdminPartnerToPortal(payload ?? {});
@@ -619,6 +623,7 @@ export async function commitAdminSpeakerPhotoUpload(
     fileSizeBytes: number;
     storageBucket: string;
     storagePath: string;
+    ifMatchToken?: string;
   }
 ): Promise<
   | {
@@ -632,7 +637,7 @@ export async function commitAdminSpeakerPhotoUpload(
       fileSizeBytes: number;
       fileName: string;
     }
-  | { ok: false; status: number; error: string }
+  | { ok: false; status: number; error: string; partner?: Partner }
 > {
   try {
     const res = await fetch(
@@ -664,6 +669,7 @@ export async function commitAdminSpeakerPhotoUpload(
         ok: false,
         status: res.status,
         error: payload?.error ?? "Could not save upload.",
+        partner: mapAdminPartnerToPortal(payload ?? {}) ?? undefined,
       };
     }
     const partner = mapAdminPartnerToPortal(payload ?? {});

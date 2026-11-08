@@ -16,11 +16,16 @@ import { PortalStorageUploadCard } from "@/features/dashboard/portal-storage-upl
 import { findSubmittedPortalDocument } from "@/lib/partner-portal-document";
 import { submissionItemsForPartner } from "@/lib/partner-portal-docs";
 import { hasAllocatedPanelSlots } from "@/lib/panel-discussion-visibility";
-import { speakerHasPersistedPhoto } from "@/lib/partner-portal-speaker";
+import {
+  speakerHasPersistedPhoto,
+  speakerPhotoMatchToken,
+} from "@/lib/partner-portal-speaker";
 import { uploadSpeakerPhotoWithStorage } from "@/lib/portal-storage-upload";
 import { SMS_CONTENT_MAX_LENGTH } from "@/lib/sms-content";
 import {
-  PORTAL_UPLOAD_ACCEPT,
+  PORTAL_DOCUMENT_FORMAT_LABEL,
+  PORTAL_SPEAKER_PHOTO_ACCEPT,
+  PORTAL_SPEAKER_PHOTO_FORMAT_LABEL,
   UPLOAD_INTERRUPTED_MESSAGE,
   validateUploadFile,
 } from "@/lib/upload-policy";
@@ -62,8 +67,8 @@ export function SubmissionsSection({
     seminarId: string,
     speakers: PartnerSeminarSpeakerDetail[]
   ) => Promise<void>;
-  onAdCreativeCommitted: () => void;
-  onStorageCommitted: () => void;
+  onAdCreativeCommitted: (partner: Partner) => void;
+  onStorageCommitted: (partner: Partner) => void;
 }) {
   const seminars = packages.flatMap((pkg) =>
     pkg.seminars.map((s) => ({
@@ -170,8 +175,8 @@ export function SubmissionsSection({
                 accept={item.accept}
                 helperText={
                   "templateUrl" in item && item.templateUrl
-                    ? "Download the format below, fill it in, then upload here"
-                    : "Click or drag a file here"
+                    ? `Download the format below, fill it in, then upload here (${PORTAL_DOCUMENT_FORMAT_LABEL})`
+                    : `Click or drag a file here (${PORTAL_DOCUMENT_FORMAT_LABEL})`
                 }
                 templateUrl={"templateUrl" in item ? item.templateUrl : undefined}
                 templateLabel={
@@ -209,6 +214,7 @@ export function SubmissionsSection({
                       onSave={(speakers) =>
                         onSaveSpeakers(seminar.eventId, seminar.id, speakers)
                       }
+                      onPhotoCommitted={onStorageCommitted}
                     />
                   );
                 })}
@@ -362,6 +368,7 @@ function SpeakerCard({
   initialSpeakers,
   saving,
   onSave,
+  onPhotoCommitted,
 }: {
   eventId: string;
   seminarId: string;
@@ -371,6 +378,7 @@ function SpeakerCard({
   initialSpeakers: PartnerSeminarSpeakerDetail[];
   saving: boolean;
   onSave: (speakers: PartnerSeminarSpeakerDetail[]) => Promise<void>;
+  onPhotoCommitted: (partner: Partner) => void;
 }) {
   const normalizeSpeaker = (
     s: PartnerSeminarSpeakerDetail
@@ -389,6 +397,7 @@ function SpeakerCard({
     photoFileName: s.photoFileName,
     photoMimeType: s.photoMimeType,
     photoFileSizeBytes: s.photoFileSizeBytes,
+    photoUploadedAt: s.photoUploadedAt,
     linkedinProfile: s.linkedinProfile ?? "",
   });
 
@@ -461,6 +470,7 @@ function SpeakerCard({
     const error = validateUploadFile({
       fileName: file.name,
       fileSizeBytes: file.size,
+      kind: "speaker_photo",
       mimeType: file.type,
     });
     if (error) {
@@ -479,14 +489,41 @@ function SpeakerCard({
       eventId,
       seminarId,
       speakerId: current?.id,
+      ifMatchToken: speakerPhotoMatchToken(current),
       onProgress: setPhotoProgress,
       onRetry: () => setFormError(UPLOAD_INTERRUPTED_MESSAGE),
     });
     setPhotoUploading(null);
     if (!result.ok) {
       setFormError(result.error);
+      setLocalPreviews((prev) => {
+        const next = { ...prev };
+        const currentPreview = next[index];
+        if (currentPreview) URL.revokeObjectURL(currentPreview);
+        delete next[index];
+        return next;
+      });
+      if (result.partner) {
+        onPhotoCommitted(result.partner);
+        const matched = result.partner.portalSeminarSpeakers
+          ?.find((row) => row.eventId === eventId && row.seminarId === seminarId)
+          ?.speakers.find((item) => item.id === current?.id);
+        if (matched) {
+          patchSpeaker(index, {
+            photoUrl: matched.photoUrl,
+            photoStorageProvider: matched.photoStorageProvider,
+            photoStorageBucket: matched.photoStorageBucket,
+            photoStoragePath: matched.photoStoragePath,
+            photoFileName: matched.photoFileName,
+            photoMimeType: matched.photoMimeType,
+            photoFileSizeBytes: matched.photoFileSizeBytes,
+            photoUploadedAt: matched.photoUploadedAt,
+          });
+        }
+      }
       return;
     }
+    if (result.partner) onPhotoCommitted(result.partner);
     patchSpeaker(index, {
       id: result.speakerId,
       photoUrl: "",
@@ -496,6 +533,7 @@ function SpeakerCard({
       photoFileName: result.fileName,
       photoMimeType: result.mimeType,
       photoFileSizeBytes: result.fileSizeBytes,
+      photoUploadedAt: new Date().toISOString(),
     });
   };
 
@@ -552,6 +590,7 @@ function SpeakerCard({
                   photoFileName: undefined,
                   photoMimeType: undefined,
                   photoFileSizeBytes: undefined,
+                  photoUploadedAt: undefined,
                 });
               }}
             />
@@ -670,8 +709,14 @@ function SpeakerPhotoField({
   onRemove: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const photoUrl = useSpeakerPhotoUrl(eventId, seminarId, speaker, localPreview);
-  const hasPhoto = Boolean(photoUrl) || speakerHasPersistedPhoto(speaker);
+  const { url: photoUrl, isResolving } = useSpeakerPhotoUrl(
+    eventId,
+    seminarId,
+    speaker,
+    localPreview
+  );
+  const hasPhoto =
+    Boolean(photoUrl) || speakerHasPersistedPhoto(speaker) || isResolving;
 
   if (hasPhoto || uploading) {
     return (
@@ -686,12 +731,15 @@ function SpeakerPhotoField({
         ) : (
           <div className="grid h-full w-full place-items-center text-ink-muted">
             <ImagePlus className="h-6 w-6" />
+            {isResolving && !uploading ? (
+              <p className="mt-1 text-[10px] font-semibold">Loading photo…</p>
+            ) : null}
           </div>
         )}
         {uploading ? (
           <div className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5">
             <p className="text-[10px] font-bold text-white">
-              {progress && progress >= 100 ? "Verifying…" : `Uploading… ${progress ?? 0}%`}
+              {progress && progress >= 100 ? "Verifying / Saving…" : `Uploading… ${progress ?? 0}%`}
             </p>
             <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/20">
               <div
@@ -715,15 +763,15 @@ function SpeakerPhotoField({
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
-          className="absolute inset-x-0 bottom-0 bg-ink/75 py-1 text-[10px] font-bold text-white opacity-0 transition group-hover:opacity-100"
+          className="absolute inset-x-0 bottom-0 bg-ink/75 py-1 text-[10px] font-bold text-white"
         >
-          Edit
+          Change Photo
         </button>
         ) : null}
         <input
           ref={inputRef}
           type="file"
-          accept={PORTAL_UPLOAD_ACCEPT}
+          accept={PORTAL_SPEAKER_PHOTO_ACCEPT}
           className="hidden"
           disabled={disabled}
           onChange={(e) => {
@@ -746,7 +794,7 @@ function SpeakerPhotoField({
       <input
         ref={inputRef}
         type="file"
-        accept={PORTAL_UPLOAD_ACCEPT}
+          accept={PORTAL_SPEAKER_PHOTO_ACCEPT}
         className="hidden"
         disabled={disabled}
         onChange={(e) => {
@@ -759,6 +807,9 @@ function SpeakerPhotoField({
         <ImagePlus className="h-5 w-5" />
       </span>
       <span className="text-xs font-bold text-ink">Add photo</span>
+      <span className="text-[10px] font-medium text-ink-muted">
+        {PORTAL_SPEAKER_PHOTO_FORMAT_LABEL}
+      </span>
     </button>
   );
 }

@@ -18,9 +18,14 @@ export async function POST(request: Request) {
     fileSizeBytes: Number(body?.fileSizeBytes) || 0,
     storageBucket: String(body?.storageBucket ?? ""),
     storagePath: String(body?.storagePath ?? ""),
+    ifMatchToken:
+      body?.ifMatchToken === undefined ? undefined : String(body.ifMatchToken ?? ""),
   });
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json(
+      { error: result.error, ...(result.partner ?? {}) },
+      { status: result.status }
+    );
   }
 
   if (result.persisted) {

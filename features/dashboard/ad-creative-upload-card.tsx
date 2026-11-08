@@ -7,7 +7,12 @@ import {
   fetchPortalDocumentAccessUrl,
   uploadAdCreativeWithStorage,
 } from "@/lib/ad-creative-upload";
-import { isStorageBackedPortalDocument } from "@/lib/partner-portal-document";
+import {
+  isStorageBackedPortalDocument,
+  portalDocumentMatchToken,
+} from "@/lib/partner-portal-document";
+import { documentFromCommittedPartner } from "@/lib/portal-dashboard-merge";
+import { resolvePortalUploadUi } from "@/lib/portal-upload-presentation";
 import {
   AD_CREATIVE_UNSUPPORTED_MESSAGE,
   formatUploadBytes,
@@ -24,20 +29,66 @@ export function AdCreativeUploadCard({
 }: {
   label: string;
   doc?: PartnerPortalDocument;
-  onCommitted: () => void;
+  onCommitted: (partner: Partner) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceMode = useRef(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "uploading" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [retryHint, setRetryHint] = useState<string | null>(null);
+  const [confirmedDoc, setConfirmedDoc] = useState<PartnerPortalDocument | undefined>();
 
-  const done = Boolean(doc);
+  const ui = resolvePortalUploadUi({
+    serverDoc: doc,
+    confirmedDoc,
+    selectedFile: Boolean(selectedFile),
+    uploading,
+    saving: uploading && status === "saving",
+    failed: status === "error",
+  });
+  const displayDoc = ui.displayDoc;
+  const done = Boolean(displayDoc);
 
-  const pickFile = useCallback((file: File | undefined) => {
+  const runUpload = useCallback(async (file: File) => {
+    if (uploading) return;
+    setUploading(true);
+    setProgress(0);
+    setStatus("uploading");
+    setMessage(null);
+    setRetryHint(null);
+
+    const result = await uploadAdCreativeWithStorage({
+      file,
+      label,
+      ifMatchToken: portalDocumentMatchToken(displayDoc),
+      onProgress: (percent) => {
+        setProgress(percent);
+        if (percent >= 100) setStatus("saving");
+      },
+      onRetry: () => setRetryHint(UPLOAD_INTERRUPTED_MESSAGE),
+    });
+
+    if (!result.ok) {
+      setUploading(false);
+      setStatus("error");
+      setMessage(result.error);
+      if (result.partner) onCommitted(result.partner);
+      return;
+    }
+
+    setConfirmedDoc(documentFromCommittedPartner(result.partner, "ad_creative"));
+    setStatus("success");
+    setMessage("Submitted.");
+    setSelectedFile(null);
+    setUploading(false);
+    onCommitted(result.partner);
+  }, [displayDoc, label, onCommitted, uploading]);
+
+  const pickFile = useCallback((file: File | undefined, autoStart = false) => {
     if (!file || uploading) return;
     const error = validateUploadFile({
       fileName: file.name,
@@ -56,45 +107,18 @@ export function AdCreativeUploadCard({
     setMessage(null);
     setProgress(0);
     setRetryHint(null);
-  }, [uploading]);
-
-  const startUpload = useCallback(async () => {
-    if (!selectedFile || uploading) return;
-    setUploading(true);
-    setProgress(0);
-    setStatus("idle");
-    setMessage(null);
-    setRetryHint(null);
-
-    const result = await uploadAdCreativeWithStorage({
-      file: selectedFile,
-      label,
-      onProgress: setProgress,
-      onRetry: () => setRetryHint(UPLOAD_INTERRUPTED_MESSAGE),
-    });
-
-    setUploading(false);
-    if (!result.ok) {
-      setStatus("error");
-      setMessage(result.error);
-      return;
-    }
-
-    setStatus("success");
-    setMessage("Advertisement creative saved.");
-    setSelectedFile(null);
-    onCommitted();
-  }, [label, onCommitted, selectedFile, uploading]);
+    if (autoStart) void runUpload(file);
+  }, [runUpload, uploading]);
 
   const openSubmitted = useCallback(async () => {
-    if (!doc) return;
-    if (doc.url?.trim() && !isStorageBackedPortalDocument(doc)) {
-      window.open(doc.url, "_blank", "noopener,noreferrer");
+    if (!displayDoc) return;
+    if (displayDoc.url?.trim() && !isStorageBackedPortalDocument(displayDoc)) {
+      window.open(displayDoc.url, "_blank", "noopener,noreferrer");
       return;
     }
     const url = await fetchPortalDocumentAccessUrl("ad_creative");
     if (url) window.open(url, "_blank", "noopener,noreferrer");
-  }, [doc]);
+  }, [displayDoc]);
 
   return (
     <div
@@ -121,7 +145,7 @@ export function AdCreativeUploadCard({
         e.preventDefault();
         setDragActive(false);
         if (uploading) return;
-        pickFile(e.dataTransfer.files?.[0]);
+        pickFile(e.dataTransfer.files?.[0], done);
       }}
     >
       <input
@@ -131,7 +155,8 @@ export function AdCreativeUploadCard({
         className="hidden"
         disabled={uploading}
         onChange={(e) => {
-          pickFile(e.target.files?.[0]);
+          pickFile(e.target.files?.[0], replaceMode.current || done);
+          replaceMode.current = false;
           e.target.value = "";
         }}
       />
@@ -150,12 +175,14 @@ export function AdCreativeUploadCard({
           <p className="mt-0.5 text-xs text-ink-muted">
             {selectedFile
               ? `${selectedFile.name} · ${formatUploadBytes(selectedFile.size)}`
-              : done && doc
-                ? `Uploaded · ${doc.fileName}`
-                : "Click or drag a file here (SVG, PNG, JPG, PDF, CDR, AI, EPS)"}
+              : ui.phase === "finalizing" && displayDoc
+                ? `Saving · ${displayDoc.fileName}`
+                : done && displayDoc
+                ? `Submitted · ${displayDoc.fileName}${displayDoc.fileSizeBytes ? ` · ${formatUploadBytes(displayDoc.fileSizeBytes)}` : ""}`
+                : "Click or drag a file here (SVG, PNG, JPG, PDF, CDR, AI or EPS)"}
           </p>
         </div>
-        {done && status !== "success" ? (
+        {done ? (
           <Check className="h-4 w-4 shrink-0 text-cu-green" strokeWidth={3} />
         ) : null}
       </div>
@@ -163,7 +190,13 @@ export function AdCreativeUploadCard({
       {uploading ? (
         <div className="mt-3 space-y-1.5">
           <div className="flex justify-between text-[11px] font-semibold text-ink-soft">
-            <span>Uploading…</span>
+            <span>
+              {status === "saving"
+                ? "Verifying / Saving…"
+                : done
+                  ? "Replacing…"
+                  : "Uploading…"}
+            </span>
             <span className="tabular-nums">{progress}%</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-ink/10">
@@ -181,22 +214,35 @@ export function AdCreativeUploadCard({
       {selectedFile && !uploading ? (
         <button
           type="button"
-          onClick={() => void startUpload()}
+          onClick={() => selectedFile && void runUpload(selectedFile)}
           className="mt-3 h-9 rounded-full bg-cu-red px-4 text-xs font-bold text-white"
         >
-          Upload
+          {status === "error" ? "Retry" : "Upload"}
         </button>
       ) : null}
 
-      {done && doc ? (
-        <button
-          type="button"
-          onClick={() => void openSubmitted()}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-cu-blue"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          View current creative
-        </button>
+      {done && displayDoc ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void openSubmitted()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View / Download
+          </button>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => {
+              replaceMode.current = true;
+              inputRef.current?.click();
+            }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-cu-red px-3 text-xs font-bold text-white disabled:opacity-50"
+          >
+            Replace Document
+          </button>
+        </div>
       ) : null}
 
       {status === "success" && message ? (

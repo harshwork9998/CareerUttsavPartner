@@ -289,16 +289,36 @@ export async function PATCH(request: Request) {
           photoFileName: s.photoFileName,
           photoMimeType: s.photoMimeType,
           photoFileSizeBytes: s.photoFileSizeBytes,
+          photoUploadedAt: s.photoUploadedAt,
           linkedinProfile: linkedIn.ok ? linkedIn.value : String(s.linkedinProfile ?? ""),
         };
+        const copyPhoto = (from: PartnerSeminarSpeakerDetail) => {
+          next.photoUrl = from.photoUrl;
+          next.photoStorageProvider = from.photoStorageProvider;
+          next.photoStorageBucket = from.photoStorageBucket;
+          next.photoStoragePath = from.photoStoragePath;
+          next.photoFileName = from.photoFileName;
+          next.photoMimeType = from.photoMimeType;
+          next.photoFileSizeBytes = from.photoFileSizeBytes;
+          next.photoUploadedAt = from.photoUploadedAt;
+        };
         if (!speakerHasPersistedPhoto(next) && prior && speakerHasPersistedPhoto(prior)) {
-          next.photoUrl = prior.photoUrl;
-          next.photoStorageProvider = prior.photoStorageProvider;
-          next.photoStorageBucket = prior.photoStorageBucket;
-          next.photoStoragePath = prior.photoStoragePath;
-          next.photoFileName = prior.photoFileName;
-          next.photoMimeType = prior.photoMimeType;
-          next.photoFileSizeBytes = prior.photoFileSizeBytes;
+          copyPhoto(prior);
+        } else if (
+          prior &&
+          speakerHasPersistedPhoto(prior) &&
+          speakerHasPersistedPhoto(next)
+        ) {
+          const priorPath = prior.photoStoragePath?.trim() || prior.photoUrl?.trim() || "";
+          const nextPath = next.photoStoragePath?.trim() || next.photoUrl?.trim() || "";
+          if (priorPath && nextPath && priorPath !== nextPath) {
+            const priorTime = Date.parse(prior.photoUploadedAt ?? "");
+            const nextTime = Date.parse(next.photoUploadedAt ?? "");
+            const incomingIsNewer =
+              Number.isFinite(nextTime) &&
+              (!Number.isFinite(priorTime) || nextTime >= priorTime);
+            if (!incomingIsNewer) copyPhoto(prior);
+          }
         }
         return {
           ...next,
@@ -324,6 +344,7 @@ export async function PATCH(request: Request) {
           fileName: speaker.photoFileName || "speaker-photo.png",
           fileSizeBytes: speaker.photoFileSizeBytes || 1,
           url,
+          kind: "speaker_photo",
         });
       })
       .find((error) => error);
@@ -377,6 +398,7 @@ export async function PATCH(request: Request) {
           photoFileName: speaker.photoFileName,
           photoMimeType: speaker.photoMimeType,
           photoFileSizeBytes: speaker.photoFileSizeBytes,
+          photoUploadedAt: speaker.photoUploadedAt,
           linkedinProfile: speaker.linkedinProfile || undefined,
         })),
       },

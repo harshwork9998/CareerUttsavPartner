@@ -3,6 +3,7 @@ import * as tus from "tus-js-client";
 import { mapAdminPartnerToPortal } from "@/lib/admin-api";
 import {
   PORTAL_STORAGE_SIZE_MESSAGE,
+  resolvedUploadContentType,
   UPLOAD_FAILED_MESSAGE,
   UPLOAD_SESSION_EXPIRED_MESSAGE,
   validateUploadFile,
@@ -64,7 +65,7 @@ export async function tusUploadToPortalStorage(input: {
       metadata: {
         bucketName: input.intent.bucket,
         objectName: input.intent.path,
-        contentType: input.file.type || "application/octet-stream",
+        contentType: resolvedUploadContentType(input.file.name, input.file.type),
         cacheControl: "3600",
       },
       onShouldRetry(error) {
@@ -92,7 +93,7 @@ export async function tusUploadToPortalStorage(input: {
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<
-  { ok: true; payload: T } | { ok: false; error: string }
+  { ok: true; payload: T } | { ok: false; error: string; payload?: T }
 > {
   const res = await fetch(url, {
     method: "POST",
@@ -102,7 +103,11 @@ async function postJson<T>(url: string, body: unknown): Promise<
   });
   const payload = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
   if (!res.ok) {
-    return { ok: false, error: payload?.error ?? UPLOAD_FAILED_MESSAGE };
+    return {
+      ok: false,
+      error: payload?.error ?? UPLOAD_FAILED_MESSAGE,
+      payload: payload as T | undefined,
+    };
   }
   return { ok: true, payload: payload as T };
 }
@@ -130,7 +135,7 @@ export async function requestPortalDocumentUploadIntent(input: {
       : `/api/partner/portal-documents/${encodeURIComponent(input.kind)}/upload-intent`;
   const result = await postJson<PortalSignedUploadIntent>(path, {
     fileName: input.file.name,
-    mimeType: input.file.type,
+    mimeType: resolvedUploadContentType(input.file.name, input.file.type),
     fileSizeBytes: input.file.size,
   });
   if (!result.ok) return result;
@@ -146,9 +151,10 @@ export async function commitPortalDocumentUpload(input: {
   file: File;
   intent: PortalSignedUploadIntent;
   label: string;
+  ifMatchToken?: string;
 }): Promise<
   | { ok: true; partner: Partner }
-  | { ok: false; error: string }
+  | { ok: false; error: string; partner?: Partner }
 > {
   const path =
     input.kind === "ad_creative"
@@ -157,13 +163,16 @@ export async function commitPortalDocumentUpload(input: {
   const result = await postJson<Record<string, unknown>>(path, {
     label: input.label,
     fileName: input.file.name,
-    mimeType: input.file.type,
+    mimeType: resolvedUploadContentType(input.file.name, input.file.type),
     fileSizeBytes: input.file.size,
     storageBucket: input.intent.bucket,
     storagePath: input.intent.path,
+    ifMatchToken: input.ifMatchToken,
   });
-  if (!result.ok) return result;
   const partner = mapAdminPartnerToPortal(result.payload ?? {});
+  if (!result.ok) {
+    return { ok: false, error: result.error, partner: partner ?? undefined };
+  }
   if (!partner) return { ok: false, error: UPLOAD_FAILED_MESSAGE };
   return { ok: true, partner };
 }
@@ -174,9 +183,10 @@ export async function uploadPortalDocumentWithStorage(input: {
   label: string;
   onProgress: (percent: number) => void;
   onRetry?: () => void;
+  ifMatchToken?: string;
 }): Promise<
   | { ok: true; partner: Partner }
-  | { ok: false; error: string }
+  | { ok: false; error: string; partner?: Partner }
 > {
   const intentResult = await requestPortalDocumentUploadIntent({
     kind: input.kind,
@@ -197,6 +207,7 @@ export async function uploadPortalDocumentWithStorage(input: {
     file: input.file,
     intent: intentResult.intent,
     label: input.label,
+    ifMatchToken: input.ifMatchToken,
   });
 }
 
@@ -212,6 +223,7 @@ export async function requestSpeakerPhotoUploadIntent(input: {
   const validation = validateUploadFile({
     fileName: input.file.name,
     fileSizeBytes: input.file.size,
+    kind: "speaker_photo",
     mimeType: input.file.type,
   });
   if (validation) return { ok: false, error: validation };
@@ -220,7 +232,7 @@ export async function requestSpeakerPhotoUploadIntent(input: {
     "/api/partner/speaker-photo/upload-intent",
     {
       fileName: input.file.name,
-      mimeType: input.file.type,
+      mimeType: resolvedUploadContentType(input.file.name, input.file.type),
       fileSizeBytes: input.file.size,
       eventId: input.eventId,
       seminarId: input.seminarId,
@@ -246,6 +258,7 @@ export async function commitSpeakerPhotoUpload(input: {
   eventId: string;
   seminarId: string;
   speakerId: string;
+  ifMatchToken?: string;
 }): Promise<
   | {
       ok: true;
@@ -258,7 +271,7 @@ export async function commitSpeakerPhotoUpload(input: {
       fileName: string;
       partner?: Partner;
     }
-  | { ok: false; error: string }
+  | { ok: false; error: string; partner?: Partner }
 > {
   const result = await postJson<{
     persisted?: boolean;
@@ -273,12 +286,19 @@ export async function commitSpeakerPhotoUpload(input: {
     seminarId: input.seminarId,
     speakerId: input.speakerId,
     fileName: input.file.name,
-    mimeType: input.file.type,
+    mimeType: resolvedUploadContentType(input.file.name, input.file.type),
     fileSizeBytes: input.file.size,
     storageBucket: input.intent.bucket,
     storagePath: input.intent.path,
+    ifMatchToken: input.ifMatchToken,
   });
-  if (!result.ok) return result;
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error,
+      partner: mapAdminPartnerToPortal(result.payload ?? {}) ?? undefined,
+    };
+  }
   if (!result.payload.speakerId || !result.payload.storageBucket || !result.payload.storagePath) {
     return { ok: false, error: UPLOAD_FAILED_MESSAGE };
   }
@@ -303,6 +323,7 @@ export async function uploadSpeakerPhotoWithStorage(input: {
   speakerId?: string;
   onProgress: (percent: number) => void;
   onRetry?: () => void;
+  ifMatchToken?: string;
 }): Promise<
   | {
       ok: true;
@@ -315,7 +336,7 @@ export async function uploadSpeakerPhotoWithStorage(input: {
       fileName: string;
       partner?: Partner;
     }
-  | { ok: false; error: string }
+  | { ok: false; error: string; partner?: Partner }
 > {
   const intentResult = await requestSpeakerPhotoUploadIntent({
     file: input.file,
@@ -339,6 +360,7 @@ export async function uploadSpeakerPhotoWithStorage(input: {
     eventId: input.eventId,
     seminarId: input.seminarId,
     speakerId: intentResult.speakerId,
+    ifMatchToken: input.ifMatchToken,
   });
 }
 

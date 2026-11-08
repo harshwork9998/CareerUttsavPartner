@@ -1,19 +1,33 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ExternalLink, FileUp, ImagePlus, X } from "lucide-react";
 import { motion } from "framer-motion";
 
-import { findSubmittedPortalDocument } from "@/lib/partner-portal-document";
-import { uploadPortalDocumentWithStorage } from "@/lib/portal-storage-upload";
+import {
+  findSubmittedPortalDocument,
+  isStorageBackedPortalDocument,
+  portalDocumentMatchToken,
+} from "@/lib/partner-portal-document";
+import { documentFromCommittedPartner } from "@/lib/portal-dashboard-merge";
+import {
+  resolvePortalUploadUi,
+  resolveSubmittedMediaFrame,
+} from "@/lib/portal-upload-presentation";
+import {
+  fetchPortalDocumentAccessUrl,
+  uploadPortalDocumentWithStorage,
+} from "@/lib/portal-storage-upload";
 import { usePortalDocumentUrl } from "@/lib/use-portal-media-url";
 import {
   formatUploadBytes,
+  isBrowserPreviewableImage,
+  PORTAL_DOCUMENT_FORMAT_LABEL,
   PORTAL_UPLOAD_ACCEPT,
   UPLOAD_INTERRUPTED_MESSAGE,
   validateUploadFile,
 } from "@/lib/upload-policy";
-import type { EventPackageSummary, Partner } from "@/lib/types";
+import type { EventPackageSummary, Partner, PartnerPortalDocument } from "@/lib/types";
 
 export function HeroSection({
   partner,
@@ -23,7 +37,7 @@ export function HeroSection({
 }: {
   partner: Partner;
   packages: EventPackageSummary[];
-  onCommitted: () => void;
+  onCommitted: (partner: Partner) => void;
   onLogoRemove: () => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,9 +48,39 @@ export function HeroSection({
   const [stage, setStage] = useState<"idle" | "uploading" | "saving">("idle");
   const [retryHint, setRetryHint] = useState<string | null>(null);
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [confirmedDoc, setConfirmedDoc] = useState<PartnerPortalDocument | undefined>();
 
-  const logoDoc = findSubmittedPortalDocument(partner.portalDocuments, "logo");
-  const logoUrl = usePortalDocumentUrl("logo", logoDoc);
+  const serverLogoDoc = findSubmittedPortalDocument(partner.portalDocuments, "logo");
+  const ui = resolvePortalUploadUi({
+    serverDoc: serverLogoDoc,
+    confirmedDoc,
+    uploading,
+    saving: uploading && stage === "saving",
+    failed: Boolean(uploadError),
+  });
+  const logoDoc = ui.displayDoc;
+  const { url: signedUrl, isResolving } = usePortalDocumentUrl("logo", logoDoc);
+  const frame = resolveSubmittedMediaFrame({
+    displayDoc: logoDoc,
+    mediaUrl: signedUrl,
+    mediaResolving: isResolving,
+    localPreview,
+    uploading,
+  });
+  const canPreviewImage = isBrowserPreviewableImage(
+    logoDoc?.fileName,
+    logoDoc?.mimeType
+  );
+  const logoUrl = canPreviewImage ? frame.imageUrl : null;
+
+  useEffect(() => {
+    if (uploading || isResolving || !signedUrl || !localPreview) return;
+    setLocalPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  }, [uploading, isResolving, signedUrl, localPreview]);
 
   const firstName = partner.name.split(" ")[0] || partner.name;
   const eventPartnerships =
@@ -73,24 +117,36 @@ export function HeroSection({
     setProgress(0);
     setStage("uploading");
     setRetryHint(null);
+    const preview = URL.createObjectURL(file);
+    setLocalPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return preview;
+    });
     const result = await uploadPortalDocumentWithStorage({
       kind: "logo",
       file,
       label: "University logo",
+      ifMatchToken: portalDocumentMatchToken(serverLogoDoc ?? confirmedDoc),
       onProgress: (percent) => {
         setProgress(percent);
         if (percent >= 100) setStage("saving");
       },
       onRetry: () => setRetryHint(UPLOAD_INTERRUPTED_MESSAGE),
     });
-    setUploading(false);
     if (!result.ok) {
+      setUploading(false);
       setUploadError(result.error);
+      setLocalPreview((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      if (result.partner) onCommitted(result.partner);
       return;
     }
-    setSelectedName(null);
+    setConfirmedDoc(documentFromCommittedPartner(result.partner, "logo"));
     setStage("idle");
-    onCommitted();
+    setUploading(false);
+    onCommitted(result.partner);
   };
 
   return (
@@ -134,7 +190,8 @@ export function HeroSection({
           transition={{ duration: 0.5, delay: 0.08, ease: [0.16, 0.84, 0.44, 1] }}
           className="w-full max-w-[420px] justify-self-center lg:justify-self-end"
         >
-          {logoUrl ? (
+          {frame.showFrame ? (
+            <>
             <div className="group relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[28px] border border-line bg-paper shadow-[0_18px_40px_rgba(20,18,26,0.08)] transition hover:border-cu-red/40">
               <button
                 type="button"
@@ -158,20 +215,36 @@ export function HeroSection({
                   className="hidden"
                   onChange={(e) => void handleFile(e.target.files?.[0])}
                 />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logoUrl}
-                  alt={`${partner.name} logo`}
-                  className="h-full w-full object-contain p-8 transition group-hover:scale-[1.02]"
-                />
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt={`${partner.name} logo`}
+                    className="h-full w-full object-contain p-8 transition group-hover:scale-[1.02]"
+                  />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-ink-muted">
+                    <FileUp className="h-8 w-8" />
+                    <p className="text-xs font-semibold">
+                      {uploading
+                        ? stage === "saving"
+                          ? "Verifying / Saving…"
+                          : "Uploading…"
+                        : logoDoc?.fileName || "Loading logo…"}
+                    </p>
+                    {logoDoc?.fileSizeBytes ? (
+                      <p className="text-[11px]">{formatUploadBytes(logoDoc.fileSizeBytes)}</p>
+                    ) : null}
+                  </div>
+                )}
                 <span className="absolute bottom-3 right-3 rounded-full bg-ink/80 px-3 py-1 text-[11px] font-semibold text-white opacity-0 transition group-hover:opacity-100">
-                  Edit
+                  Replace
                 </span>
               </button>
               {uploading ? (
                 <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-ink/80 p-3 text-white">
                   <div className="flex justify-between text-[11px] font-semibold">
-                    <span>{stage === "saving" ? "Verifying…" : "Uploading…"}</span>
+                    <span>{stage === "saving" ? "Verifying / Saving…" : "Uploading…"}</span>
                     <span className="tabular-nums">{progress}%</span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20">
@@ -189,6 +262,33 @@ export function HeroSection({
                 </div>
               ) : null}
             </div>
+            {logoDoc && !uploading ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (logoDoc.url?.trim() && !isStorageBackedPortalDocument(logoDoc)) {
+                      window.open(logoDoc.url, "_blank", "noopener,noreferrer");
+                      return;
+                    }
+                    const url = await fetchPortalDocumentAccessUrl("logo");
+                    if (url) window.open(url, "_blank", "noopener,noreferrer");
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-bold text-ink"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View / Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-cu-red px-3 text-xs font-bold text-white"
+                >
+                  Replace Document
+                </button>
+              </div>
+            ) : null}
+            </>
           ) : (
             <div className="cu-panel !p-6 sm:!p-7">
               <h2 className="font-display text-2xl font-bold tracking-tight">
@@ -196,7 +296,7 @@ export function HeroSection({
               </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-ink-soft">
                 A transparent background works best for stall boards and venue
-                creatives.
+                creatives. {PORTAL_DOCUMENT_FORMAT_LABEL}.
               </p>
 
               <button
@@ -265,7 +365,7 @@ export function HeroSection({
               ) : null}
             </div>
           )}
-          {logoUrl && uploadError ? (
+          {frame.showFrame && uploadError ? (
             <p className="mt-2 text-xs font-semibold text-cu-red">{uploadError}</p>
           ) : null}
         </motion.div>
